@@ -1,41 +1,80 @@
 'use client'
-import { useState } from 'react'
-import { Site, Email, EmailAnalysis, Notification, Task } from '@/lib/types'
+import { useState, useCallback } from 'react'
+import {
+  Site, Email, EmailAnalysis, Notification, Task,
+  Plan, Takeoff, WorkerRate, MultiAIResponse,
+} from '@/lib/types'
 import { COLORS } from '@/lib/constants'
 import { INITIAL_SITES, INITIAL_NOTIFS } from '@/lib/data'
 import { callAI } from '@/lib/ai'
 
-import TopBar from '@/components/layout/TopBar'
-import BottomNav from '@/components/layout/BottomNav'
-import SiteCard from '@/components/sites/SiteCard'
-import ChatTab from '@/components/chat/ChatTab'
-import EmailList from '@/components/email/EmailList'
-import EmailDetail from '@/components/email/EmailDetail'
-import TaskList from '@/components/tasks/TaskList'
-import NotifPanel from '@/components/notifications/NotifPanel'
+import TopBar       from '@/components/layout/TopBar'
+import BottomNav    from '@/components/layout/BottomNav'
+import SiteCard     from '@/components/sites/SiteCard'
+import ChatTab      from '@/components/chat/ChatTab'
+import EmailList    from '@/components/email/EmailList'
+import EmailDetail  from '@/components/email/EmailDetail'
+import TaskList     from '@/components/tasks/TaskList'
+import NotifPanel   from '@/components/notifications/NotifPanel'
+import PlanGrid     from '@/components/plans/PlanGrid'
+import PlanDetail   from '@/components/plans/PlanDetail'
+import PlanDuplicateAlert from '@/components/plans/PlanDuplicateAlert'
+import QuantityTakeoff    from '@/components/quotes/QuantityTakeoff'
+import WorkerRateCapture  from '@/components/quotes/WorkerRateCapture'
+import Toast        from '@/components/ui/Toast'
 
-type BottomTab = 'sites' | 'chat' | 'emails' | 'tasks' | 'notifs'
+type Tab = 'sites' | 'chat' | 'plans' | 'quotes' | 'emails' | 'tasks' | 'notifs'
 
 const CURRENT_USER = 'valentin'
 
 export default function Home() {
-  const [sites, setSites] = useState<Site[]>(INITIAL_SITES)
-  const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFS)
-  const [selectedSite, setSelectedSite] = useState<Site | null>(null)
-  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
-  const [bottomTab, setBottomTab] = useState<BottomTab>('sites')
-  const [aiInput, setAiInput] = useState('')
-  const [aiReply, setAiReply] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [analyses, setAnalyses] = useState<Map<string, EmailAnalysis>>(new Map())
+  // ── core state ──────────────────────────────────────────────────────────
+  const [sites,         setSites]        = useState<Site[]>(INITIAL_SITES)
+  const [notifs,        setNotifs]       = useState<Notification[]>(INITIAL_NOTIFS)
+  const [selectedSite,  setSelectedSite] = useState<Site | null>(null)
+  const [selectedEmail, setSelectedEmail]= useState<Email | null>(null)
+  const [selectedPlan,  setSelectedPlan] = useState<Plan | null>(null)
+  const [tab,           setTab]          = useState<Tab>('sites')
+
+  // ── plans & quotes ───────────────────────────────────────────────────────
+  const [plans,         setPlans]        = useState<Plan[]>([])
+  const [takeoffs,      setTakeoffs]     = useState<Takeoff[]>([])
+  const [workerRates,   setWorkerRates]  = useState<WorkerRate[]>([])
+  const [pendingDups,   setPendingDups]  = useState<Array<{plan: Plan; existing: Plan}>>([])
+  const [showRateCapture, setShowRateCapture] = useState(false)
+
+  // ── email AI ─────────────────────────────────────────────────────────────
+  const [analyses,  setAnalyses]  = useState<Map<string, EmailAnalysis>>(new Map())
   const [analysing, setAnalysing] = useState<string | null>(null)
 
-  // Derived counts
-  const currentSite = sites.find(s => s.id === selectedSite?.id) ?? null
-  const unreadEmails = currentSite?.emails.filter(e => !e.read).length ?? 0
-  const urgentTasks = currentSite?.tasks.filter(t => !t.done && t.priority === 'high').length ?? 0
-  const unreadNotifs = notifs.filter(n => !n.read).length
+  // ── chat AI (single) ─────────────────────────────────────────────────────
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiReply,   setAiReply]   = useState('')
+  const [aiInput,   setAiInput]   = useState('')
 
+  // ── multi-AI council ─────────────────────────────────────────────────────
+  const [multiLoading, setMultiLoading] = useState(false)
+  const [multiResult,  setMultiResult]  = useState<MultiAIResponse | null>(null)
+
+  // ── toast ─────────────────────────────────────────────────────────────────
+  const [toast,      setToast]      = useState<string | null>(null)
+  const [toastColor, setToastColor] = useState(COLORS.amber)
+
+  function showToast(msg: string, col = COLORS.amber) {
+    setToast(msg)
+    setToastColor(col)
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  // ── derived ──────────────────────────────────────────────────────────────
+  const currentSite   = sites.find(s => s.id === selectedSite?.id) ?? null
+  const sitePlans     = plans.filter(p => p.siteId === currentSite?.id)
+  const siteTakeoffs  = takeoffs.filter(t => t.siteId === currentSite?.id)
+  const unreadEmails  = currentSite?.emails.filter(e => !e.read).length ?? 0
+  const urgentTasks   = currentSite?.tasks.filter(t => !t.done && t.priority === 'high').length ?? 0
+  const unreadNotifs  = notifs.filter(n => !n.read).length
+
+  // ── helpers ──────────────────────────────────────────────────────────────
   function updateSite(updated: Site) {
     setSites(prev => prev.map(s => s.id === updated.id ? updated : s))
     if (selectedSite?.id === updated.id) setSelectedSite(updated)
@@ -43,27 +82,29 @@ export default function Home() {
 
   function goSite(site: Site) {
     setSelectedSite(site)
-    setBottomTab('chat')
+    setTab('chat')
     setSelectedEmail(null)
+    setSelectedPlan(null)
     setAiReply('')
+    setMultiResult(null)
   }
 
   function goBack() {
-    if (selectedEmail) {
-      setSelectedEmail(null)
-      return
-    }
+    if (selectedPlan)  { setSelectedPlan(null);  return }
+    if (selectedEmail) { setSelectedEmail(null); return }
     setSelectedSite(null)
-    setBottomTab('sites')
+    setTab('sites')
     setAiReply('')
+    setMultiResult(null)
   }
 
-  function handleTab(tab: BottomTab) {
-    setBottomTab(tab)
+  function handleTab(t: Tab) {
+    setTab(t as Tab)
     setSelectedEmail(null)
+    setSelectedPlan(null)
   }
 
-  // Send message
+  // ── messages ──────────────────────────────────────────────────────────────
   function sendMessage(text: string) {
     if (!currentSite) return
     const msg = {
@@ -73,158 +114,179 @@ export default function Home() {
       time: new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
       pinned: false,
     }
-    const updated = { ...currentSite, messages: [...currentSite.messages, msg] }
-    updateSite(updated)
+    updateSite({ ...currentSite, messages: [...currentSite.messages, msg] })
   }
 
-  // Notify all (urgent)
   function notifyAll(text: string) {
     if (!currentSite) return
     sendMessage(text)
-    const notif: Notification = {
+    addNotif(currentSite.id, 'urgent', text)
+    showToast('🚨 Urgent alert sent to team', COLORS.red)
+  }
+
+  function addNotif(siteId: string, type: string, text: string) {
+    const n: Notification = {
       id: `n-${Date.now()}`,
-      siteId: currentSite.id,
-      type: 'urgent',
+      siteId,
+      type,
       text,
       time: new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
       read: false,
     }
-    setNotifs(prev => [notif, ...prev])
+    setNotifs(prev => [n, ...prev])
   }
 
-  // Notify team about email
-  function notifyTeamAboutEmail() {
-    if (!currentSite || !selectedEmail) return
-    const notif: Notification = {
-      id: `n-${Date.now()}`,
-      siteId: currentSite.id,
-      type: 'email',
-      text: `Team alert: "${selectedEmail.subject}" from ${selectedEmail.fromName}`,
-      time: new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }),
-      read: false,
-    }
-    setNotifs(prev => [notif, ...prev])
-    // Mark email as read
-    const updatedEmails = currentSite.emails.map(e =>
-      e.id === selectedEmail.id ? { ...e, read: true } : e
-    )
-    updateSite({ ...currentSite, emails: updatedEmails })
+  // ── email ─────────────────────────────────────────────────────────────────
+  function selectEmail(email: Email) {
+    if (!currentSite) return
+    updateSite({ ...currentSite, emails: currentSite.emails.map(e => e.id === email.id ? { ...e, read: true } : e) })
+    setSelectedEmail(email)
   }
 
-  // Analyse email with AI
   async function analyseEmail() {
     if (!selectedEmail || !currentSite) return
     setAnalysing(selectedEmail.id)
     try {
-      const system = `You are a construction project management AI assistant. Analyse emails for construction site managers. Return ONLY valid JSON with these fields: category (invoice|compliance|drawings|safety|report|general), priority (high|medium|low), summary (1 sentence), action (what the PM should do next, 1 sentence), isInvoice (boolean), amount (number if invoice, omit otherwise), dueDate (string if invoice, omit otherwise).`
-      const user = `Email from: ${selectedEmail.fromName} <${selectedEmail.from}>
-Subject: ${selectedEmail.subject}
-Body: ${selectedEmail.body}
-Site: ${currentSite.name} (Client: ${currentSite.client})`
-
-      const raw = await callAI(system, user)
-      const json = JSON.parse(raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim())
-      setAnalyses(prev => new Map(prev).set(selectedEmail.id, json as EmailAnalysis))
-      // Mark email as read
-      const updatedEmails = currentSite.emails.map(e =>
-        e.id === selectedEmail.id ? { ...e, read: true } : e
+      const raw = await callAI(
+        `You are a construction PM AI. Analyse emails. Return ONLY valid JSON: { category, priority, summary, action, isInvoice, amount?, dueDate? }. category options: invoice|compliance|drawings|safety|report|general. priority: high|medium|low.`,
+        `From: ${selectedEmail.fromName} <${selectedEmail.from}>\nSubject: ${selectedEmail.subject}\nBody: ${selectedEmail.body}\nSite: ${currentSite.name}`
       )
-      updateSite({ ...currentSite, emails: updatedEmails })
-    } catch {
-      // Silent fail - user can retry
-    }
+      const json = JSON.parse(raw.replace(/```json\n?|```\n?/g, '').trim())
+      setAnalyses(prev => new Map(prev).set(selectedEmail.id, json as EmailAnalysis))
+      updateSite({ ...currentSite, emails: currentSite.emails.map(e => e.id === selectedEmail.id ? { ...e, read: true } : e) })
+    } catch { /* silent */ }
     setAnalysing(null)
   }
 
-  // Ask AI
-  async function askAI() {
-    if (!aiInput.trim() || !currentSite) return
+  function notifyTeamAboutEmail() {
+    if (!currentSite || !selectedEmail) return
+    addNotif(currentSite.id, 'email', `Team alert: "${selectedEmail.subject}" from ${selectedEmail.fromName}`)
+    showToast('📢 Team notified', COLORS.blue)
+  }
+
+  // ── AI single ─────────────────────────────────────────────────────────────
+  async function askAI(question?: string) {
+    const q = question || aiInput
+    if (!q.trim() || !currentSite) return
     setAiLoading(true)
     setAiReply('')
     try {
-      const system = `You are FOREMAN AI, an expert construction project management assistant. Answer concisely and practically for site managers. Keep responses under 200 words.`
-      const user = `Site: ${currentSite.name} | Phase: ${currentSite.phase} | Progress: ${currentSite.progress}%
-Open tasks: ${currentSite.tasks.filter(t => !t.done).map(t => t.text).join('; ')}
-Recent messages: ${currentSite.messages.slice(-3).map(m => `${m.userId}: ${m.text}`).join(' | ')}
-
-Question: ${aiInput}`
-      const reply = await callAI(system, user)
+      const reply = await callAI(
+        `You are FOREMAN AI, expert construction project management assistant. Answer concisely and practically. Max 200 words.`,
+        `Site: ${currentSite.name} | Phase: ${currentSite.phase} | Progress: ${currentSite.progress}%\nOpen tasks: ${currentSite.tasks.filter(t=>!t.done).map(t=>t.text).join('; ')}\nRecent chat: ${currentSite.messages.slice(-3).map(m=>`${m.userId}: ${m.text}`).join(' | ')}\n\nQuestion: ${q}`
+      )
       setAiReply(reply)
-    } catch {
-      setAiReply('AI is temporarily unavailable.')
-    }
+    } catch { setAiReply('AI temporarily unavailable.') }
     setAiLoading(false)
   }
 
-  // Toggle task
-  function toggleTask(taskId: string) {
-    if (!currentSite) return
-    const updated = {
-      ...currentSite,
-      tasks: currentSite.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t),
-    }
-    updateSite(updated)
+  // ── AI council (3 heads) ──────────────────────────────────────────────────
+  async function askMultiAI(question: string) {
+    if (!question.trim()) return
+    setMultiLoading(true)
+    setMultiResult(null)
+    try {
+      const context = currentSite
+        ? `Site: ${currentSite.name} | Phase: ${currentSite.phase} | Budget: $${currentSite.budget.toLocaleString()} | Spent: $${currentSite.spent.toLocaleString()}`
+        : undefined
+      const res = await fetch('/api/ai/multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, context }),
+      })
+      const data = await res.json()
+      setMultiResult(data as MultiAIResponse)
+    } catch { /* silent */ }
+    setMultiLoading(false)
   }
 
-  // Add task
-  function addTask(text: string) {
+  // ── tasks ─────────────────────────────────────────────────────────────────
+  function toggleTask(id: string) {
     if (!currentSite) return
-    const task: Task = {
-      id: `task-${Date.now()}`,
-      text,
-      done: false,
-      priority: 'med',
-      assign: CURRENT_USER,
-      due: 'TBD',
-    }
+    updateSite({ ...currentSite, tasks: currentSite.tasks.map(t => t.id === id ? { ...t, done: !t.done } : t) })
+  }
+
+  function addTask(text: string, priority: 'high'|'med'|'low' = 'med', assign: string = CURRENT_USER) {
+    if (!currentSite) return
+    const task: Task = { id: `task-${Date.now()}`, text, done: false, priority, assign, due: 'TBD' }
     updateSite({ ...currentSite, tasks: [...currentSite.tasks, task] })
   }
 
-  // Read notif
+  // ── plans ─────────────────────────────────────────────────────────────────
+  const handlePlanUpload = useCallback((plan: Plan) => {
+    if (plan.isDuplicate && plan.duplicateOf) {
+      const existing = plans.find(p => p.id === plan.duplicateOf)
+      if (existing) {
+        setPendingDups(prev => [...prev, { plan, existing }])
+        addNotif(plan.siteId, 'urgent', `⚠️ Possible duplicate plan: "${plan.name}"`)
+        return
+      }
+    }
+    setPlans(prev => [...prev, plan])
+    addNotif(plan.siteId, 'plan', `📐 New plan added: ${plan.name} (${plan.discipline})`)
+    showToast(`✓ Plan analyzed: ${plan.discipline}`, COLORS.green)
+  }, [plans])
+
+  function keepBothPlans(dup: { plan: Plan; existing: Plan }) {
+    setPlans(prev => [...prev, { ...dup.plan, isDuplicate: false }])
+    setPendingDups(prev => prev.filter(d => d.plan.id !== dup.plan.id))
+    showToast('Both plans kept', COLORS.amber)
+  }
+
+  function discardDuplicate(dup: { plan: Plan; existing: Plan }) {
+    setPendingDups(prev => prev.filter(d => d.plan.id !== dup.plan.id))
+    showToast('Duplicate discarded', COLORS.w60)
+  }
+
+  // ── takeoffs ──────────────────────────────────────────────────────────────
+  function saveTakeoff(t: Takeoff) {
+    setTakeoffs(prev => [...prev, { ...t, id: `to-${Date.now()}` }])
+    if (currentSite) addNotif(currentSite.id, 'takeoff', `🔢 Quantity takeoff saved: $${t.total.toLocaleString('en-AU')}`)
+    showToast(`✓ Quotation saved — $${t.total.toLocaleString('en-AU')} AUD`, COLORS.amber)
+    handleTab('quotes')
+  }
+
+  // ── notifs ─────────────────────────────────────────────────────────────────
   function readNotif(id: string) {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
   }
-
-  // Mark all read
-  function markAllRead() {
-    setNotifs(prev => prev.map(n => ({ ...n, read: true })))
-  }
-
-  // Navigate from notif
   function navigateFromNotif(siteId: string) {
     const site = sites.find(s => s.id === siteId)
     if (site) goSite(site)
-    else setBottomTab('notifs')
   }
 
-  // Select email
-  function selectEmail(email: Email) {
-    if (!currentSite) return
-    const updatedEmails = currentSite.emails.map(e => e.id === email.id ? { ...e, read: true } : e)
-    updateSite({ ...currentSite, emails: updatedEmails })
-    setSelectedEmail(email)
-  }
-
-  const showEmail = selectedEmail && currentSite
+  // ── render ────────────────────────────────────────────────────────────────
+  const showEmailDetail = selectedEmail && currentSite
+  const showPlanDetail  = selectedPlan  && currentSite
 
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        maxHeight: '100dvh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: COLORS.bg0,
-        color: COLORS.w80,
-        maxWidth: 480,
-        margin: '0 auto',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Email detail is fullscreen (no nav) */}
-      {showEmail ? (
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight:'100dvh', maxHeight:'100dvh', display:'flex', flexDirection:'column', background:'var(--bg0)', color:'var(--w80)', maxWidth:480, margin:'0 auto', position:'relative', overflow:'hidden' }}>
+
+      {/* Subtle grid background */}
+      <div className="bg-grid" />
+
+      {/* Toast */}
+      {toast && <Toast message={toast} col={toastColor} />}
+
+      {/* Duplicate alert modals */}
+      {pendingDups.length > 0 && (
+        <div style={{ position:'fixed', inset:0, zIndex:500, background:'rgba(3,3,10,0.85)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          {pendingDups.slice(0,1).map(dup => (
+            <div key={dup.plan.id} style={{ width:'100%', maxWidth:420 }}>
+              <PlanDuplicateAlert
+                plan={dup.plan}
+                existingPlan={dup.existing}
+                onKeep={() => keepBothPlans(dup)}
+                onDiscard={() => discardDuplicate(dup)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Email detail — fullscreen, no nav */}
+      {showEmailDetail ? (
+        <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
           <EmailDetail
             email={selectedEmail}
             site={currentSite}
@@ -233,6 +295,15 @@ Question: ${aiInput}`
             onAnalyse={analyseEmail}
             analysis={analyses.get(selectedEmail.id) ?? null}
             analysing={analysing === selectedEmail.id}
+          />
+        </div>
+      ) : showPlanDetail ? (
+        /* Plan detail — fullscreen, no nav */
+        <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+          <PlanDetail
+            plan={selectedPlan}
+            onBack={() => setSelectedPlan(null)}
+            onTakeoff={plan => { setSelectedPlan(null); handleTab('quotes') }}
           />
         </div>
       ) : (
@@ -244,16 +315,15 @@ Question: ${aiInput}`
             unreadCount={unreadNotifs}
           />
 
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            {/* Sites list */}
-            {bottomTab === 'sites' && !currentSite && (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, color: COLORS.w40, fontWeight: 700, letterSpacing: '0.12em', marginBottom: 4 }}>
-                    ACTIVE SITES
-                  </div>
-                  <div style={{ fontSize: 11, color: COLORS.w40 }}>
-                    {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}
+          <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+
+            {/* ── SITES ────────────────────────────────────────────── */}
+            {tab === 'sites' && !currentSite && (
+              <div className="content-scroll">
+                <div style={{ marginBottom:14 }}>
+                  <div style={{ fontSize:9, fontWeight:800, letterSpacing:'0.2em', color:'var(--w40)', textTransform:'uppercase', marginBottom:4 }}>Active Sites</div>
+                  <div style={{ fontSize:11, color:'var(--w40)' }}>
+                    {new Date().toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' })}
                   </div>
                 </div>
                 {sites.map(site => (
@@ -262,8 +332,8 @@ Question: ${aiInput}`
               </div>
             )}
 
-            {/* Chat */}
-            {bottomTab === 'chat' && currentSite && (
+            {/* ── CHAT ─────────────────────────────────────────────── */}
+            {tab === 'chat' && currentSite && (
               <ChatTab
                 site={currentSite}
                 currentUserId={CURRENT_USER}
@@ -274,16 +344,91 @@ Question: ${aiInput}`
                 aiInput={aiInput}
                 onAiInputChange={setAiInput}
                 onAskAI={askAI}
+                onAskMultiAI={askMultiAI}
+                multiAILoading={multiLoading}
+                multiAIResult={multiResult}
               />
             )}
 
-            {/* Emails */}
-            {bottomTab === 'emails' && currentSite && (
+            {/* ── PLANS ─────────────────────────────────────────────── */}
+            {tab === 'plans' && currentSite && (
+              <div className="content-scroll">
+                <PlanGrid
+                  plans={sitePlans}
+                  onSelectPlan={plan => setSelectedPlan(plan)}
+                  onAddPlan={handlePlanUpload}
+                  siteId={currentSite.id}
+                />
+              </div>
+            )}
+
+            {/* ── QUOTES ───────────────────────────────────────────── */}
+            {tab === 'quotes' && currentSite && (
+              <div className="content-scroll">
+                {/* Worker rate capture toggle */}
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                  <div className="sec-title">Quantity Takeoff & Quotation</div>
+                  <button className="btn btn-sm btn-ghost" onClick={() => setShowRateCapture(r=>!r)}>
+                    {showRateCapture ? '✕ Close Rates' : '📸 My Rates'}
+                  </button>
+                </div>
+
+                {showRateCapture && (
+                  <div style={{ marginBottom:14 }} className="anim-in">
+                    <WorkerRateCapture
+                      userId={CURRENT_USER}
+                      onRatesExtracted={rates => {
+                        setWorkerRates(prev => {
+                          const merged = [...prev]
+                          rates.forEach(r => {
+                            const idx = merged.findIndex(m => m.task === r.task && m.userId === r.userId)
+                            if (idx >= 0) merged[idx] = r
+                            else merged.push(r)
+                          })
+                          return merged
+                        })
+                        setShowRateCapture(false)
+                        showToast(`✓ ${rates.length} rates extracted`, COLORS.green)
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Saved takeoffs */}
+                {siteTakeoffs.length > 0 && (
+                  <div style={{ marginBottom:16 }}>
+                    <div className="sec-title" style={{ marginBottom:10 }}>Saved Quotations</div>
+                    {siteTakeoffs.map(t => (
+                      <div key={t.id} className="card card-shine anim-up" style={{ marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:700, color:'var(--w90)', marginBottom:2 }}>{t.planName || t.scope.substring(0,40)}</div>
+                          <div style={{ fontSize:11, color:'var(--w40)' }}>{new Date(t.date).toLocaleDateString('en-AU')} · {t.materials.length} materials · {t.labour.length} trades</div>
+                        </div>
+                        <div style={{ fontFamily:'var(--font-mono)', fontSize:14, fontWeight:700, color:'var(--amber)' }}>
+                          ${t.total.toLocaleString('en-AU')}
+                        </div>
+                      </div>
+                    ))}
+                    <hr className="sep" />
+                  </div>
+                )}
+
+                <QuantityTakeoff
+                  plan={sitePlans.length > 0 ? sitePlans[0] : null}
+                  siteId={currentSite.id}
+                  workerRates={workerRates}
+                  onSaveTakeoff={saveTakeoff}
+                />
+              </div>
+            )}
+
+            {/* ── EMAILS ───────────────────────────────────────────── */}
+            {tab === 'emails' && currentSite && (
               <EmailList site={currentSite} onSelectEmail={selectEmail} />
             )}
 
-            {/* Tasks */}
-            {bottomTab === 'tasks' && currentSite && (
+            {/* ── TASKS ────────────────────────────────────────────── */}
+            {tab === 'tasks' && currentSite && (
               <TaskList
                 site={currentSite}
                 currentUserId={CURRENT_USER}
@@ -292,25 +437,25 @@ Question: ${aiInput}`
               />
             )}
 
-            {/* Notifications */}
-            {bottomTab === 'notifs' && (
+            {/* ── NOTIFS ───────────────────────────────────────────── */}
+            {tab === 'notifs' && (
               <NotifPanel
                 notifs={notifs}
                 sites={sites}
                 onRead={readNotif}
                 onNavigate={navigateFromNotif}
-                onMarkAllRead={markAllRead}
+                onMarkAllRead={() => setNotifs(prev => prev.map(n => ({ ...n, read: true })))}
               />
             )}
           </div>
 
           <BottomNav
+            tab={tab}
             site={currentSite}
-            activeTab={bottomTab}
-            onTab={handleTab}
             unreadEmails={unreadEmails}
             urgentTasks={urgentTasks}
             unreadNotifs={unreadNotifs}
+            onTab={(t: string) => handleTab(t as Tab)}
           />
         </>
       )}

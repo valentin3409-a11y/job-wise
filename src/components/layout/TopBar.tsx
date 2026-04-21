@@ -1,6 +1,5 @@
 'use client'
 import { Site } from '@/lib/types'
-import { COLORS } from '@/lib/constants'
 import Avatar from '@/components/ui/Avatar'
 
 interface Props {
@@ -15,67 +14,51 @@ export default function TopBar({ site, onBack, onNotifsClick, unreadCount }: Pro
   const overflow = site ? Math.max(0, site.teamIds.length - 3) : 0
 
   return (
-    <div
-      style={{
-        height: 54,
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        background: COLORS.bg1 + 'E6',
-        backdropFilter: 'blur(12px)',
-        borderBottom: `1px solid ${COLORS.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        gap: 12,
-      }}
-    >
-      {/* Logo / back */}
+    <div className="topbar">
+      {/* Left side */}
       {site ? (
-        <button
-          onClick={onBack}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: 0,
-          }}
-        >
-          <span style={{ color: COLORS.w60, fontSize: 18 }}>←</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Back button */}
+          <button
+            onClick={onBack}
+            className="btn btn-ghost btn-icon"
+            style={{ width: 34, height: 34, fontSize: 16 }}
+            aria-label="Go back"
+          >
+            ←
+          </button>
+          {/* Colored dot */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: site.color,
+              boxShadow: `0 0 8px ${site.color}`,
+              flexShrink: 0,
             }}
+          />
+          {/* Site name */}
+          <span
+            className="truncate"
+            style={{ fontSize: 14, fontWeight: 700, color: 'var(--w90)', maxWidth: 140 }}
           >
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: site.color,
-                boxShadow: `0 0 6px ${site.color}`,
-                flexShrink: 0,
-              }}
-            />
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.w80, lineHeight: 1.2 }}>{site.shortName}</div>
-              <div style={{ fontSize: 10, color: COLORS.w60 }}>{site.phase}</div>
-            </div>
-          </div>
-        </button>
+            {site.name}
+          </span>
+          {/* Separator */}
+          <span style={{ color: 'var(--border3)', fontSize: 12, flexShrink: 0 }}>|</span>
+          {/* Phase */}
+          <span style={{ fontSize: 10, color: 'var(--w40)', flexShrink: 0 }}>{site.phase}</span>
+        </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* F Logo */}
           <div
             style={{
               width: 28,
               height: 28,
-              borderRadius: 6,
-              background: `linear-gradient(135deg, ${COLORS.amber}, #E8913A)`,
+              borderRadius: 8,
+              background: 'linear-gradient(125deg, var(--amber), var(--amber2))',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -83,29 +66,52 @@ export default function TopBar({ site, onBack, onNotifsClick, unreadCount }: Pro
               fontWeight: 900,
               color: '#000',
               fontFamily: 'var(--font-mono)',
+              flexShrink: 0,
             }}
           >
             F
           </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: COLORS.w80, letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>FOREMAN</div>
-            <div style={{ fontSize: 9, color: COLORS.amber, letterSpacing: '0.15em', fontWeight: 700 }}>SITE HUB</div>
-          </div>
+          {/* FOREMAN wordmark */}
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: 'var(--w90)',
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.08em',
+            }}
+          >
+            FOREMAN
+          </span>
+          {/* Separator */}
+          <span style={{ color: 'var(--border3)', fontSize: 12 }}>|</span>
+          {/* Tagline */}
+          <span
+            style={{
+              fontSize: 9,
+              color: 'var(--amber)',
+              fontWeight: 700,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            SITE HUB
+          </span>
         </div>
       )}
 
+      {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* Team avatars */}
+      {/* Right side: team avatars (only when site active) */}
       {site && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: -6 }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            {teamIds.map((uid, i) => (
-              <div key={uid} style={{ marginLeft: i > 0 ? -6 : 0 }}>
-                <Avatar uid={uid} size={26} />
-              </div>
-            ))}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {teamIds.map((uid, i) => (
+            <div key={uid} style={{ marginLeft: i > 0 ? -6 : 0, zIndex: teamIds.length - i }}>
+              <Avatar uid={uid} size={26} />
+            </div>
+          ))}
           {overflow > 0 && (
             <div
               style={{
@@ -113,14 +119,16 @@ export default function TopBar({ site, onBack, onNotifsClick, unreadCount }: Pro
                 width: 26,
                 height: 26,
                 borderRadius: '50%',
-                background: COLORS.border2,
-                border: `1.5px solid ${COLORS.border}`,
+                background: 'var(--bg4)',
+                border: '1.5px solid var(--border2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 9,
-                color: COLORS.w60,
                 fontWeight: 700,
+                color: 'var(--w60)',
+                fontFamily: 'var(--font-mono)',
+                flexShrink: 0,
               }}
             >
               +{overflow}
@@ -129,43 +137,29 @@ export default function TopBar({ site, onBack, onNotifsClick, unreadCount }: Pro
         </div>
       )}
 
-      {/* Bell */}
+      {/* Bell button */}
       <button
         onClick={onNotifsClick}
-        style={{
-          position: 'relative',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          width: 36,
-          height: 36,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 18,
-        }}
+        className="btn btn-ghost btn-icon"
+        style={{ position: 'relative', fontSize: 18 }}
+        aria-label="Notifications"
       >
         🔔
         {unreadCount > 0 && (
-          <div
+          <span
+            className="badge"
             style={{
               position: 'absolute',
-              top: 4,
-              right: 4,
-              width: 16,
-              height: 16,
-              borderRadius: '50%',
-              background: COLORS.red,
-              color: '#fff',
-              fontSize: 9,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              top: 2,
+              right: 1,
+              minWidth: 15,
+              height: 15,
+              fontSize: 8,
+              padding: '0 3px',
             }}
           >
             {unreadCount}
-          </div>
+          </span>
         )}
       </button>
     </div>

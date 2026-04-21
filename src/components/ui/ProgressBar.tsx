@@ -1,5 +1,4 @@
 'use client'
-import { COLORS } from '@/lib/constants'
 
 interface Props {
   val: number
@@ -7,24 +6,20 @@ interface Props {
   h?: number
 }
 
-export default function ProgressBar({ val, col, h = 4 }: Props) {
+export default function ProgressBar({ val, col, h = 3 }: Props) {
+  const pct = Math.min(100, Math.max(0, val))
+
   return (
     <div
-      style={{
-        width: '100%',
-        height: h,
-        background: COLORS.w20,
-        borderRadius: h,
-        overflow: 'hidden',
-      }}
+      className="progress-track"
+      style={{ height: h }}
     >
       <div
+        className="progress-fill"
         style={{
-          height: '100%',
-          width: `${Math.min(100, Math.max(0, val))}%`,
+          width: `${pct}%`,
           background: col,
-          borderRadius: h,
-          transition: 'width 0.4s ease',
+          height: '100%',
         }}
       />
     </div>

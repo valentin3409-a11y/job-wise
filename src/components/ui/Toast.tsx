@@ -8,21 +8,24 @@ interface Props {
 export default function Toast({ message, col }: Props) {
   return (
     <div
+      className="anim-up"
       style={{
         position: 'fixed',
-        bottom: 80,
+        bottom: 76,
         left: '50%',
         transform: 'translateX(-50%)',
-        background: col + '22',
-        border: `1px solid ${col}66`,
-        color: col,
-        padding: '10px 20px',
-        borderRadius: 10,
-        fontSize: 13,
-        fontWeight: 600,
         zIndex: 9999,
-        animation: 'slideUp 0.25s ease',
+        background: 'rgba(12,12,24,0.95)',
+        backdropFilter: 'blur(20px)',
+        border: `1px solid ${col}59`,
+        boxShadow: `0 0 20px ${col}33`,
+        color: col,
+        padding: '11px 20px',
+        borderRadius: 12,
+        fontSize: 12,
+        fontWeight: 600,
         whiteSpace: 'nowrap',
+        pointerEvents: 'none',
       }}
     >
       {message}

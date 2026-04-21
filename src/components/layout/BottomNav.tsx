@@ -1,101 +1,73 @@
 'use client'
 import { Site } from '@/lib/types'
-import { COLORS } from '@/lib/constants'
-
-type Tab = 'sites' | 'chat' | 'emails' | 'tasks' | 'notifs'
 
 interface Props {
+  tab: string
   site: Site | null
-  activeTab: Tab
-  onTab: (tab: Tab) => void
   unreadEmails: number
   urgentTasks: number
   unreadNotifs: number
+  onTab: (t: string) => void
 }
 
-export default function BottomNav({ site, activeTab, onTab, unreadEmails, urgentTasks, unreadNotifs }: Props) {
-  const activeColor = site?.color ?? COLORS.amber
+type NavItem = {
+  id: string
+  icon: string
+  label: string
+  tClass?: string
+  badge?: number
+  badgeClass?: string
+}
 
-  const tabs: { id: Tab; icon: string; label: string; badge?: number }[] = site
-    ? [
-        { id: 'chat',   icon: '💬', label: 'Chat'   },
-        { id: 'emails', icon: '📧', label: 'Emails', badge: unreadEmails },
-        { id: 'tasks',  icon: '✅', label: 'Tasks',  badge: urgentTasks  },
-        { id: 'notifs', icon: '🔔', label: 'Alerts', badge: unreadNotifs },
-      ]
-    : [
-        { id: 'sites',  icon: '🏗️', label: 'Sites'  },
-        { id: 'notifs', icon: '🔔', label: 'Alerts', badge: unreadNotifs },
-      ]
+export default function BottomNav({ tab, site, unreadEmails, urgentTasks, unreadNotifs, onTab }: Props) {
+  const noSiteTabs: NavItem[] = [
+    { id: 'sites',  icon: '🏗️', label: 'Sites' },
+    { id: 'notifs', icon: '🔔', label: 'Alerts', tClass: 't-purple', badge: unreadNotifs },
+  ]
+
+  const siteTabs: NavItem[] = [
+    { id: 'sites',  icon: '🏗️', label: 'Sites' },
+    { id: 'chat',   icon: '💬', label: 'Chat',   tClass: 't-blue' },
+    { id: 'plans',  icon: '📐', label: 'Plans',  tClass: 't-indigo' },
+    { id: 'quotes', icon: '🔢', label: 'Quotes', tClass: 't-green' },
+    { id: 'emails', icon: '📧', label: 'Emails', badge: unreadEmails },
+    { id: 'tasks',  icon: '✅', label: 'Tasks',  badge: urgentTasks, badgeClass: 'badge-amber' },
+    { id: 'notifs', icon: '🔔', label: 'Alerts', tClass: 't-purple', badge: unreadNotifs },
+  ]
+
+  const tabs = site ? siteTabs : noSiteTabs
 
   return (
-    <div
-      style={{
-        height: 64,
-        position: 'sticky',
-        bottom: 0,
-        background: COLORS.bg1,
-        borderTop: `1px solid ${COLORS.border}`,
-        display: 'flex',
-        alignItems: 'stretch',
-        zIndex: 100,
-      }}
-    >
-      {tabs.map(tab => {
-        const isActive = activeTab === tab.id
+    <div className="bottom-nav">
+      {tabs.map(t => {
+        const isActive = tab === t.id
+        const activeClass = isActive ? (t.tClass ? `active ${t.tClass}` : 'active') : ''
         return (
           <button
-            key={tab.id}
-            onClick={() => onTab(tab.id)}
-            style={{
-              flex: 1,
-              background: 'none',
-              border: 'none',
-              borderTop: isActive ? `2px solid ${activeColor}` : '2px solid transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              position: 'relative',
-              paddingTop: 2,
-            }}
+            key={t.id}
+            className={`nav-btn ${activeClass}`}
+            onClick={() => onTab(t.id)}
           >
-            <span style={{ fontSize: 20 }}>{tab.icon}</span>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: isActive ? activeColor : COLORS.w40,
-                letterSpacing: '0.04em',
-              }}
-            >
-              {tab.label}
+            <span className="nav-icon" style={{ position: 'relative' }}>
+              {t.icon}
+              {t.badge != null && t.badge > 0 && (
+                <span
+                  className={`badge ${t.badgeClass ?? ''}`}
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -6,
+                    minWidth: 14,
+                    height: 14,
+                    fontSize: 8,
+                    padding: '0 3px',
+                  }}
+                >
+                  {t.badge}
+                </span>
+              )}
             </span>
-            {tab.badge != null && tab.badge > 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 6,
-                  right: '50%',
-                  marginRight: -18,
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  background: COLORS.red,
-                  color: '#fff',
-                  fontSize: 9,
-                  fontWeight: 700,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: '0 4px',
-                }}
-              >
-                {tab.badge}
-              </div>
-            )}
+            <span className="nav-lbl">{t.label}</span>
           </button>
         )
       })}

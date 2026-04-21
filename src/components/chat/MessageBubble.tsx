@@ -1,7 +1,7 @@
 'use client'
 import { Message, Site } from '@/lib/types'
 import { TEAM } from '@/lib/data'
-import { COLORS, ROLES } from '@/lib/constants'
+import { ROLES } from '@/lib/constants'
 import Avatar from '@/components/ui/Avatar'
 
 interface Props {
@@ -16,51 +16,72 @@ export default function MessageBubble({ message, isMe, site }: Props) {
 
   const roleInfo = ROLES[user.role]
 
-  if (isMe) {
+  if (message.pinned) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <div style={{ maxWidth: '75%' }}>
-          <div
-            style={{
-              background: `linear-gradient(135deg, ${site.color}CC, ${site.color}88)`,
-              borderRadius: '16px 16px 4px 16px',
-              padding: '10px 14px',
-              color: '#fff',
-              fontSize: 13,
-              lineHeight: 1.55,
-            }}
-          >
-            {message.text}
-          </div>
-          <div style={{ fontSize: 10, color: COLORS.w40, marginTop: 3, textAlign: 'right' }}>{message.time}</div>
-        </div>
+      <div className="pinned-strip" style={{ marginBottom: 8 }}>
+        <BubbleContent message={message} isMe={isMe} user={user} roleInfo={roleInfo} site={site} pinned />
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
-      <Avatar uid={message.userId} size={30} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <BubbleContent message={message} isMe={isMe} user={user} roleInfo={roleInfo} site={site} pinned={false} />
+  )
+}
+
+function BubbleContent({
+  message, isMe, user, roleInfo, pinned,
+}: {
+  message: Message
+  isMe: boolean
+  user: ReturnType<typeof TEAM.find> & object
+  roleInfo: { label: string; color: string }
+  site: Site
+  pinned: boolean
+}) {
+  if (pinned) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ color: 'var(--amber)', fontSize: 12, flexShrink: 0 }}>📌</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: roleInfo.color }}>
+            {(user as { name: string }).name}:
+          </span>{' '}
+          <span style={{ fontSize: 12, color: 'var(--w80)', lineHeight: 1.6 }}>{message.text}</span>
+        </div>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--w40)', flexShrink: 0 }}>{message.time}</span>
+      </div>
+    )
+  }
+
+  if (isMe) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginBottom: 12 }}>
+        <div className="bubble-me">
+          <p style={{ fontSize: 13, color: 'var(--w80)', lineHeight: 1.6, margin: 0 }}>{message.text}</p>
+        </div>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--w40)', marginTop: 4 }}>{message.time}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 12 }}>
+      <Avatar uid={message.userId} size={28} />
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+        {/* Name + role */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: roleInfo.color }}>{user.name}</span>
-          <span style={{ fontSize: 10, color: COLORS.w40 }}>{roleInfo.label}</span>
-          <span style={{ fontSize: 10, color: COLORS.w40 }}>{message.time}</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: roleInfo.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {(user as { name: string }).name}
+          </span>
+          <span style={{ fontSize: 9, color: 'var(--w40)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {roleInfo.label}
+          </span>
         </div>
-        <div
-          style={{
-            background: COLORS.bg3,
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: '4px 16px 16px 16px',
-            padding: '10px 14px',
-            color: COLORS.w80,
-            fontSize: 13,
-            lineHeight: 1.55,
-            maxWidth: '80%',
-          }}
-        >
-          {message.text}
+        <div className="bubble-other">
+          <p style={{ fontSize: 13, color: 'var(--w80)', lineHeight: 1.6, margin: 0 }}>{message.text}</p>
         </div>
+        <span className="mono" style={{ fontSize: 10, color: 'var(--w40)', marginTop: 4 }}>{message.time}</span>
       </div>
     </div>
   )
