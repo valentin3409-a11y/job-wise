@@ -89,3 +89,70 @@ $$ language plpgsql;
 create trigger applications_updated_at
   before update on public.applications
   for each row execute procedure public.set_updated_at();
+
+-- ============================================================
+-- TRADING BOT — tables (run separately if adding to existing DB)
+-- ============================================================
+
+-- Trading sessions / bot runs
+create table if not exists public.trading_sessions (
+  id           uuid default uuid_generate_v4() primary key,
+  user_id      uuid references public.profiles(id) on delete cascade,
+  mode         text default 'paper' check (mode in ('paper','live')),
+  status       text default 'stopped',
+  config       jsonb default '{}',
+  started_at   timestamptz,
+  stopped_at   timestamptz,
+  created_at   timestamptz default now()
+);
+alter table public.trading_sessions enable row level security;
+create policy "own trading sessions" on public.trading_sessions for all using (auth.uid() = user_id);
+
+-- Individual trades
+create table if not exists public.trades (
+  id            uuid default uuid_generate_v4() primary key,
+  session_id    uuid references public.trading_sessions(id) on delete cascade,
+  user_id       uuid references public.profiles(id) on delete cascade,
+  symbol        text not null,
+  asset_type    text not null check (asset_type in ('crypto','stock')),
+  action        text not null check (action in ('buy','sell')),
+  quantity      numeric not null,
+  price         numeric not null,
+  total_value   numeric not null,
+  fee           numeric default 0,
+  reason        text,
+  confidence    integer,
+  mode          text default 'paper',
+  status        text default 'executed',
+  executed_at   timestamptz default now()
+);
+alter table public.trades enable row level security;
+create policy "own trades" on public.trades for all using (auth.uid() = user_id);
+
+-- Market analysis snapshots
+create table if not exists public.market_analyses (
+  id           uuid default uuid_generate_v4() primary key,
+  session_id   uuid references public.trading_sessions(id) on delete cascade,
+  symbol       text not null,
+  asset_type   text not null,
+  action       text,
+  confidence   integer,
+  reasoning    text,
+  risk_level   text,
+  market_data  jsonb,
+  indicators   jsonb,
+  created_at   timestamptz default now()
+);
+
+-- Portfolio snapshots (periodic)
+create table if not exists public.portfolio_snapshots (
+  id             uuid default uuid_generate_v4() primary key,
+  session_id     uuid references public.trading_sessions(id) on delete cascade,
+  total_value    numeric,
+  cash_balance   numeric,
+  invested_value numeric,
+  total_pnl      numeric,
+  total_pnl_pct  numeric,
+  positions      jsonb default '[]',
+  snapped_at     timestamptz default now()
+);
