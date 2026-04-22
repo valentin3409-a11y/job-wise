@@ -9,6 +9,7 @@ import {
   refreshPositionPrices, executePaperTrade,
 } from './state'
 import { executeLiveOrder } from './exchanges'
+import { fetchTrendingCryptos, fetchTrendingStocks, filterNew } from './discovery'
 
 let _timer: ReturnType<typeof setTimeout> | null = null
 
@@ -67,13 +68,46 @@ export async function runCycle(): Promise<void> {
 
     addLog(`Market data fetched: ${allMarket.length} assets, ${news.length} news items`)
 
+    // ── 1b. Discover trending assets ───────────────────────────────────────
+    const [trendCrypto, trendStocks] = await Promise.all([
+      fetchTrendingCryptos(),
+      fetchTrendingStocks(),
+    ])
+    const allSymbols = enabled.map(a => a.symbol)
+    const newCrypto  = filterNew(trendCrypto, allSymbols)
+    const newStocks  = filterNew(trendStocks, allSymbols)
+    const discovered = [...newCrypto, ...newStocks]
+
+    if (discovered.length > 0) {
+      addLog(`Discovered ${discovered.length} trending assets: ${discovered.map(d => d.symbol).join(', ')}`)
+      // Fetch prices for discovered assets
+      const discCryptoSymbols = newCrypto.map(d => d.symbol)
+      const discStockSymbols  = newStocks.map(d => d.symbol)
+      const [discCryptoData, discStockData] = await Promise.all([
+        discCryptoSymbols.length ? fetchCryptoPrices(discCryptoSymbols) : Promise.resolve([]),
+        discStockSymbols.length  ? fetchStockPrices(discStockSymbols)   : Promise.resolve([]),
+      ])
+      updateMarketData([...discCryptoData, ...discStockData])
+    }
+
+    // Build full asset list for analysis: enabled + discovered
+    const discoveryMap = new Map(discovered.map(d => [d.symbol, d.reason]))
+    const allForAnalysis = [
+      ...enabled.map(a => ({ symbol: a.symbol, assetType: a.assetType, discoveryReason: undefined })),
+      ...discovered.map(d => ({ symbol: d.symbol, assetType: d.assetType, discoveryReason: d.reason })),
+    ]
+    // Update marketMap to include discovered assets
+    const fullMarketMap = Object.fromEntries(
+      Object.entries(getState().marketData)
+    )
+
     // ── 2. Stop-loss / take-profit check ───────────────────────────────────
     await checkAutoExit()
 
     // ── 3. Fetch OHLCV for technical analysis ──────────────────────────────
     const ohlcvMap: Record<string, any[]> = {}
     await Promise.allSettled(
-      enabled.map(async a => {
+      [...enabled, ...discovered.map(d => ({ symbol: d.symbol, assetType: d.assetType, enabled: true }))].map(async a => {
         ohlcvMap[a.symbol] = a.assetType === 'crypto'
           ? await fetchCryptoOHLCV(a.symbol, 30)
           : await fetchStockOHLCV(a.symbol, 30)
@@ -81,8 +115,7 @@ export async function runCycle(): Promise<void> {
     )
 
     // ── 4. Claude AI analysis ──────────────────────────────────────────────
-    const marketMap = Object.fromEntries(allMarket.map(m => [m.symbol, m]))
-    const signals   = await analyzeAll(enabled, marketMap, ohlcvMap, news, s.config.risk)
+    const signals   = await analyzeAll(allForAnalysis, fullMarketMap, ohlcvMap, news, s.config.risk)
 
     for (const sig of signals) {
       updateSignal(sig)
