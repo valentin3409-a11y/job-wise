@@ -3,22 +3,26 @@ import { MarketData, OHLCV, TechnicalIndicators, NewsItem, AISignal, AssetType, 
 import { computeIndicators } from './market'
 import { newsContextForSymbol } from './news'
 import { computeLevels } from './risk'
+import { fetchCoinFundamentals } from './discovery'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 // ─── Analyse one asset with Claude ───────────────────────────────────────────
 export async function analyzeAsset(
-  symbol:    string,
-  assetType: AssetType,
-  market:    MarketData,
-  ohlcv:     OHLCV[],
-  news:      NewsItem[],
-  risk:      RiskConfig,
+  symbol:           string,
+  assetType:        AssetType,
+  market:           MarketData,
+  ohlcv:            OHLCV[],
+  news:             NewsItem[],
+  risk:             RiskConfig,
+  discoveryReason?: string,
 ): Promise<AISignal> {
   const ind     = computeIndicators(ohlcv)
   const newsCtx = newsContextForSymbol(news, symbol)
 
-  const prompt = buildPrompt(symbol, assetType, market, ind, newsCtx)
+  const fundamentals = assetType === 'crypto' ? await fetchCoinFundamentals(symbol).catch(() => '') : ''
+
+  const prompt = buildPrompt(symbol, assetType, market, ind, newsCtx, fundamentals, discoveryReason)
 
   try {
     const msg = await client.messages.create({
@@ -52,15 +56,15 @@ export async function analyzeAsset(
 
 // ─── Batch-analyse all enabled assets ────────────────────────────────────────
 export async function analyzeAll(
-  assets:    { symbol: string; assetType: AssetType }[],
-  marketMap: Record<string, MarketData>,
-  ohlcvMap:  Record<string, OHLCV[]>,
-  news:      NewsItem[],
-  risk:      RiskConfig,
+  assets:       { symbol: string; assetType: AssetType; discoveryReason?: string }[],
+  marketMap:    Record<string, MarketData>,
+  ohlcvMap:     Record<string, OHLCV[]>,
+  news:         NewsItem[],
+  risk:         RiskConfig,
 ): Promise<AISignal[]> {
   const results = await Promise.allSettled(
     assets.map(a =>
-      analyzeAsset(a.symbol, a.assetType, marketMap[a.symbol], ohlcvMap[a.symbol] ?? [], news, risk)
+      analyzeAsset(a.symbol, a.assetType, marketMap[a.symbol], ohlcvMap[a.symbol] ?? [], news, risk, a.discoveryReason)
     )
   )
   return results.flatMap(r => r.status === 'fulfilled' ? [r.value] : [])
@@ -73,15 +77,18 @@ function buildPrompt(
   market:    MarketData,
   ind:       TechnicalIndicators,
   newsCtx:   string,
+  fundamentals?: string,
+  discoveryReason?: string,
 ): string {
-  return `You are an expert quantitative trading analyst. Analyse the following market data and provide a precise trading recommendation.
+  return `You are an elite quantitative analyst and portfolio manager with deep expertise in both crypto and equities. Analyse all available data and provide a precise trading recommendation.
 
-ASSET: ${symbol} (${assetType.toUpperCase()})
+ASSET: ${symbol} (${assetType.toUpperCase()})${discoveryReason ? ` — DISCOVERED: ${discoveryReason}` : ''}
 PRICE:    $${fmt(market.price)}
 24h CHG:  ${market.changePct24h.toFixed(2)}% ($${fmt(market.change24h)})
 VOLUME:   $${fmtM(market.volume24h)}M
 DAY H/L:  $${fmt(market.high24h)} / $${fmt(market.low24h)}
 ${market.marketCap ? `MKTCAP:   $${fmtB(market.marketCap)}B` : ''}
+${fundamentals ? `\nFUNDAMENTALS:\n${fundamentals}` : ''}
 
 TECHNICALS:
   Trend:      ${ind.trend}
@@ -93,20 +100,27 @@ TECHNICALS:
   Resistance: ${ind.resistance ? '$' + fmt(ind.resistance) : 'N/A'}
   Volatility: ${ind.volatility !== null ? ind.volatility.toFixed(2) + '%' : 'N/A'}
 
-NEWS (last 24h):
+NEWS & SENTIMENT (last 24h):
 ${newsCtx}
 
-Respond ONLY with a valid JSON object (no markdown, no explanation outside JSON):
+INSTRUCTIONS:
+- For DISCOVERED assets: be especially thorough — research the project quality, team, tokenomics, use case
+- Consider: is the trending/momentum sustainable or a pump?
+- Factor in macro environment, sector momentum, correlation with BTC/market
+- Be contrarian when warranted — high confidence only when multiple signals align
+
+Respond ONLY with valid JSON (no markdown):
 {
   "action": "buy" | "sell" | "hold",
   "confidence": <integer 0-100>,
   "priceTarget": <number or null>,
   "stopLoss": <number>,
   "takeProfit": <number>,
-  "reasoning": "<2-3 sentence rationale>",
+  "reasoning": "<3-4 sentence rationale covering technicals + fundamentals + news>",
   "technicalSummary": "<1-sentence technical summary>",
-  "newsImpact": "<1-sentence news impact>",
-  "riskLevel": "low" | "medium" | "high"
+  "newsImpact": "<1-sentence news/fundamental impact>",
+  "riskLevel": "low" | "medium" | "high",
+  "projectQuality": "strong" | "moderate" | "weak" | "unknown"
 }`
 }
 
