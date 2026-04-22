@@ -18,7 +18,14 @@ export const DEFAULT_CONFIG: BotConfig = {
     { symbol: 'TSLA', assetType: 'stock',  enabled: true },
   ],
   risk:      DEFAULT_RISK,
-  exchanges: { binanceTestnet: true, alpacaPaper: true },
+  exchanges: {
+    binanceKey:     process.env.BINANCE_API_KEY,
+    binanceSecret:  process.env.BINANCE_API_SECRET,
+    binanceTestnet: false,
+    alpacaKey:      process.env.ALPACA_API_KEY,
+    alpacaSecret:   process.env.ALPACA_API_SECRET,
+    alpacaPaper:    false,
+  },
 }
 
 function emptyPortfolio(capital: number): Portfolio {

@@ -2,10 +2,17 @@ import crypto from 'crypto'
 import { Trade, TradingMode } from './types'
 
 // ─── Binance connector ────────────────────────────────────────────────────────
-const BINANCE_BASE       = 'https://api.binance.com'
-const BINANCE_TESTNET    = 'https://testnet.binance.vision'
+const BINANCE_BASE    = 'https://api.binance.com'
+const BINANCE_TESTNET = 'https://testnet.binance.vision'
+const MIN_NOTIONAL    = 15   // Binance minimum order value USD
 
-export async function binanceOrder(trade: Trade, apiKey: string, apiSecret: string, testnet = true): Promise<boolean> {
+export async function binanceOrder(trade: Trade, apiKey: string, apiSecret: string, testnet = false): Promise<boolean> {
+  const notional = trade.quantity * trade.price
+  if (notional < MIN_NOTIONAL) {
+    console.warn(`[Binance] order too small: $${notional.toFixed(2)} < $${MIN_NOTIONAL} minimum`)
+    return false
+  }
+
   const base     = testnet ? BINANCE_TESTNET : BINANCE_BASE
   const symbol   = `${trade.symbol}USDT`
   const side     = trade.action.toUpperCase()   // BUY | SELL
@@ -61,7 +68,7 @@ export async function binanceBalance(apiKey: string, apiSecret: string, testnet 
 const ALPACA_PAPER = 'https://paper-api.alpaca.markets'
 const ALPACA_LIVE  = 'https://api.alpaca.markets'
 
-export async function alpacaOrder(trade: Trade, apiKey: string, apiSecret: string, paper = true): Promise<boolean> {
+export async function alpacaOrder(trade: Trade, apiKey: string, apiSecret: string, paper = false): Promise<boolean> {
   const base = paper ? ALPACA_PAPER : ALPACA_LIVE
   const body = {
     symbol:     trade.symbol,

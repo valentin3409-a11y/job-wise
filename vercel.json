@@ -2,7 +2,6 @@
   "functions": {
     "app/api/search/route.ts":          { "maxDuration": 60 },
     "app/api/analyze/route.ts":         { "maxDuration": 60 },
-    "app/api/cv/route.ts":              { "maxDuration": 30 },
     "app/api/trading/cycle/route.ts":   { "maxDuration": 60 },
     "app/api/trading/cron/route.ts":    { "maxDuration": 60 },
     "app/api/trading/control/route.ts": { "maxDuration": 10 },
