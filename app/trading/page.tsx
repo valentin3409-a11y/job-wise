@@ -66,6 +66,24 @@ export default function TradingPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadState])
 
+  // ── Build current config from UI state ───────────────────────────────────────
+  function buildConfig() {
+    const exchanges: Record<string, unknown> = { binanceTestnet: false, alpacaPaper: false }
+    if (binanceKey)    exchanges.binanceKey    = binanceKey
+    if (binanceSecret) exchanges.binanceSecret = binanceSecret
+    if (alpacaKey)     exchanges.alpacaKey     = alpacaKey
+    if (alpacaSecret)  exchanges.alpacaSecret  = alpacaSecret
+    return {
+      mode, intervalMinutes: Number(intMin), initialCapital: Number(capital),
+      risk: {
+        stopLossPct: Number(sl), takeProfitPct: Number(tp),
+        minConfidence: Number(minConf), maxConcurrentPositions: Number(maxPos),
+        maxPositionSizePct: 10, maxDailyLossPct: 15,
+      },
+      exchanges,
+    }
+  }
+
   // ── Controls ─────────────────────────────────────────────────────────────────
   async function ctrl(action: string, extra?: object) {
     setLoading(true)
@@ -89,22 +107,7 @@ export default function TradingPage() {
 
   async function applySettings() {
     if (mode === 'live' && !liveConfirm) { setLiveConfirm(true); return }
-    const exchanges: Record<string, unknown> = { binanceTestnet: false, alpacaPaper: false }
-    if (binanceKey)    exchanges.binanceKey    = binanceKey
-    if (binanceSecret) exchanges.binanceSecret = binanceSecret
-    if (alpacaKey)     exchanges.alpacaKey     = alpacaKey
-    if (alpacaSecret)  exchanges.alpacaSecret  = alpacaSecret
-    await ctrl('reset', {
-      config: {
-        mode, intervalMinutes: Number(intMin), initialCapital: Number(capital),
-        risk: {
-          stopLossPct: Number(sl), takeProfitPct: Number(tp),
-          minConfidence: Number(minConf), maxConcurrentPositions: Number(maxPos),
-          maxPositionSizePct: 10, maxDailyLossPct: 15,
-        },
-        exchanges,
-      },
-    })
+    await ctrl('reset', { config: buildConfig() })
     setLiveConfirm(false)
   }
 
@@ -153,7 +156,7 @@ export default function TradingPage() {
           <button onClick={() => ctrl('stop')} disabled={loading}
             style={btnStyle('#3a1b1b', '#ef9a9a', '#c62828')}>■ Stop</button>
         ) : (
-          <button onClick={() => ctrl('start')} disabled={loading}
+          <button onClick={() => ctrl('start', { config: buildConfig() })} disabled={loading}
             style={btnStyle('#1b3a1b', '#81c784', '#2e7d32')}>▶ Démarrer</button>
         )}
         <button onClick={cycle} disabled={cycling || loading}
