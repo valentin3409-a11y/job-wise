@@ -43,9 +43,8 @@ function scheduleNext(): void {
 // ─── One full analysis + trade cycle ─────────────────────────────────────────
 export async function runCycle(): Promise<void> {
   const s = getState()
-  if (s.status === 'stopped') return
-
-  const prev = s.status
+  // Run regardless of status — on serverless each request may be a fresh Lambda
+  const prev = s.status === 'stopped' ? 'running' : s.status
   setStatus('analyzing')
   addLog(`Cycle #${s.cycleCount + 1} started`)
 
