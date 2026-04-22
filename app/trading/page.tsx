@@ -100,30 +100,22 @@ export default function TradingPage() {
     } finally { setLoading(false) }
   }
 
+  // Always send config with cycle so it works on a fresh Lambda
   async function cycle() {
     setCycling(true)
     try {
-      const r = await fetch('/api/trading/cycle', { method: 'POST' })
+      const r = await fetch('/api/trading/cycle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: buildConfig() }),
+      })
       const d = await r.json()
       if (d.state) setState(d.state)
     } finally { setCycling(false) }
   }
 
-  // Start = apply config + run first cycle immediately so data appears
   async function startWithCycle() {
-    setLoading(true)
-    try {
-      await fetch('/api/trading/control', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start', config: buildConfig() }),
-      })
-      // Run cycle immediately on same Lambda (60s timeout)
-      setCycling(true)
-      const r = await fetch('/api/trading/cycle', { method: 'POST' })
-      const d = await r.json()
-      if (d.state) setState(d.state)
-    } finally { setLoading(false); setCycling(false) }
+    await cycle()
   }
 
   async function applySettings() {
