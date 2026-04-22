@@ -1,5 +1,6 @@
 {
   "functions": {
+    "app/api/jarvis/route.ts":          { "maxDuration": 60 },
     "app/api/search/route.ts":          { "maxDuration": 60 },
     "app/api/analyze/route.ts":         { "maxDuration": 60 },
     "app/api/trading/cycle/route.ts":   { "maxDuration": 60 },

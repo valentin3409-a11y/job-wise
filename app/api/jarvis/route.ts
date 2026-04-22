@@ -1,34 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'ANTHROPIC_API_KEY manquante — configure-la sur Vercel' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
   try {
     const { message, systemPrompt, history } = await req.json()
 
     if (!message?.trim()) {
-      return NextResponse.json({ error: 'Message required' }, { status: 400 })
+      return new Response(
+        JSON.stringify({ error: 'Message vide' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
-    const messages: Anthropic.MessageParam[] = [
-      ...(history || []),
-      { role: 'user', content: message },
-    ]
-
-    const response = await client.messages.create({
+    const stream = client.messages.stream({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       system: systemPrompt,
-      messages,
+      messages: [
+        ...(history ?? []),
+        { role: 'user', content: message },
+      ],
     })
 
-    const block = response.content[0]
-    const text = block.type === 'text' ? block.text : ''
+    const encoder = new TextEncoder()
+    const body = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const text of stream.textStream) {
+            controller.enqueue(encoder.encode(text))
+          }
+          controller.close()
+        } catch (err) {
+          controller.error(err)
+        }
+      },
+    })
 
-    return NextResponse.json({ response: text })
-  } catch (err) {
-    console.error('JARVIS API error:', err)
-    return NextResponse.json({ error: 'JARVIS system failure' }, { status: 500 })
+    return new Response(body, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  } catch (err: any) {
+    console.error('JARVIS error:', err)
+    return new Response(
+      JSON.stringify({ error: err?.message ?? 'Erreur système JARVIS' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
   }
 }
