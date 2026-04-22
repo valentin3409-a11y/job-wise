@@ -1,7 +1,16 @@
 {
   "functions": {
-    "app/api/search/route.ts":  { "maxDuration": 60 },
-    "app/api/analyze/route.ts": { "maxDuration": 60 },
-    "app/api/cv/route.ts":      { "maxDuration": 30 }
-  }
+    "app/api/search/route.ts":          { "maxDuration": 60 },
+    "app/api/analyze/route.ts":         { "maxDuration": 60 },
+    "app/api/trading/cycle/route.ts":   { "maxDuration": 60 },
+    "app/api/trading/cron/route.ts":    { "maxDuration": 60 },
+    "app/api/trading/control/route.ts": { "maxDuration": 10 },
+    "app/api/trading/state/route.ts":   { "maxDuration": 10 }
+  },
+  "crons": [
+    {
+      "path":     "/api/trading/cron",
+      "schedule": "0 8 * * *"
+    }
+  ]
 }
