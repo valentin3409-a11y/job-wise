@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'JobWise Trading Bot',
-  description: 'Bot de trading IA autonome — crypto & actions en temps réel',
+  title: 'JARVIS — Ton Mentor IA',
+  description: 'Assistant IA personnel — mentor finance, sport, business, tech et plus',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Trading Bot',
+    title: 'JARVIS',
   },
   icons: {
     icon: '/favicon.ico',
@@ -21,7 +21,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#f0c040',
+  themeColor: '#00d4ff',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

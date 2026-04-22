@@ -1,11 +1,11 @@
 {
-  "name": "JobWise Trading Bot",
-  "short_name": "Trading Bot",
-  "description": "Bot de trading IA autonome — crypto & actions",
-  "start_url": "/trading",
+  "name": "JARVIS — Ton Mentor IA",
+  "short_name": "JARVIS",
+  "description": "Assistant IA personnel — mentor finance, sport, business, tech et plus",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d0d0d",
-  "theme_color": "#f0c040",
+  "background_color": "#020b10",
+  "theme_color": "#00d4ff",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -21,6 +21,5 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [],
-  "categories": ["finance", "productivity"]
+  "categories": ["productivity", "lifestyle", "finance", "health"]
 }
