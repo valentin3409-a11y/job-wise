@@ -10,7 +10,7 @@
   "crons": [
     {
       "path":     "/api/trading/cron",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 */6 * * *"
     }
   ]
 }
