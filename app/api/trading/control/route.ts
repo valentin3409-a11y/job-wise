@@ -13,8 +13,9 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case 'start':
+        if (config) resetState(config)
         startBot()
-        return NextResponse.json({ ok: true, status: 'running' })
+        return NextResponse.json({ ok: true, status: 'running', config: getState().config })
 
       case 'stop':
         stopBot()
