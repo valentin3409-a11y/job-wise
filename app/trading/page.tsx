@@ -40,6 +40,12 @@ export default function TradingPage() {
   const [tp,          setTp]         = useState('20')
   const [minConf,     setMinConf]    = useState('65')
   const [maxPos,      setMaxPos]     = useState('8')
+  // Exchange API keys (never sent to third parties)
+  const [binanceKey,    setBinanceKey]    = useState('')
+  const [binanceSecret, setBinanceSecret] = useState('')
+  const [alpacaKey,     setAlpacaKey]     = useState('')
+  const [alpacaSecret,  setAlpacaSecret]  = useState('')
+  const [liveConfirm,   setLiveConfirm]   = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Polling ──────────────────────────────────────────────────────────────────
@@ -82,6 +88,12 @@ export default function TradingPage() {
   }
 
   async function applySettings() {
+    if (mode === 'live' && !liveConfirm) { setLiveConfirm(true); return }
+    const exchanges: Record<string, unknown> = { binanceTestnet: false, alpacaPaper: false }
+    if (binanceKey)    exchanges.binanceKey    = binanceKey
+    if (binanceSecret) exchanges.binanceSecret = binanceSecret
+    if (alpacaKey)     exchanges.alpacaKey     = alpacaKey
+    if (alpacaSecret)  exchanges.alpacaSecret  = alpacaSecret
     await ctrl('reset', {
       config: {
         mode, intervalMinutes: Number(intMin), initialCapital: Number(capital),
@@ -90,8 +102,10 @@ export default function TradingPage() {
           minConfidence: Number(minConf), maxConcurrentPositions: Number(maxPos),
           maxPositionSizePct: 10, maxDailyLossPct: 15,
         },
+        exchanges,
       },
     })
+    setLiveConfirm(false)
   }
 
   const s = state
@@ -389,6 +403,36 @@ export default function TradingPage() {
           <div>
             <SectionTitle>Paramètres</SectionTitle>
 
+            {/* Live confirmation modal */}
+            {liveConfirm && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+                <div style={{ background: '#1a0a0a', border: '2px solid #c62828', borderRadius: 14,
+                  padding: 24, maxWidth: 340, width: '100%' }}>
+                  <div style={{ fontSize: 28, textAlign: 'center', marginBottom: 12 }}>🔴</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#ef5350', textAlign: 'center', marginBottom: 12 }}>
+                    TRADING AVEC ARGENT RÉEL
+                  </div>
+                  <div style={{ fontSize: 12, color: '#aaa', lineHeight: 1.7, marginBottom: 20 }}>
+                    Le bot va exécuter de <strong style={{ color: '#fff' }}>vrais ordres</strong> sur vos comptes Binance / Alpaca.
+                    Vous pouvez perdre de l'argent réel. Assurez-vous d'avoir entré vos clés API et compris les risques.
+                  </div>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={() => setLiveConfirm(false)}
+                      style={{ flex: 1, padding: '11px 0', fontSize: 13, fontWeight: 600,
+                        background: '#111', color: '#aaa', border: '1px solid #333', borderRadius: 8, cursor: 'pointer' }}>
+                      Annuler
+                    </button>
+                    <button onClick={applySettings}
+                      style={{ flex: 1, padding: '11px 0', fontSize: 13, fontWeight: 700,
+                        background: '#c62828', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}>
+                      Confirmer LIVE
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div style={{ ...card({ marginBottom: 12 }) }}>
               <Label>Mode</Label>
               <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
@@ -399,14 +443,15 @@ export default function TradingPage() {
                       background: mode === m ? (m === 'paper' ? '#1a2a3a' : '#2a1a1a') : '#0d0d0d',
                       color:      mode === m ? (m === 'paper' ? '#7ab3e0' : '#ef9a9a') : '#555',
                       borderColor: mode === m ? (m === 'paper' ? '#1e4a70' : '#5c1a1a') : '#222' }}>
-                    {m === 'paper' ? '📝 Paper' : '⚡ Live'}
+                    {m === 'paper' ? '📝 Paper' : '🔴 Live — Argent Réel'}
                   </button>
                 ))}
               </div>
               {mode === 'live' && (
-                <div style={{ fontSize: 11, color: '#ef9a9a', marginBottom: 14, padding: '8px 10px',
-                  background: '#1a0a0a', borderRadius: 6, border: '1px solid #3a1b1b' }}>
-                  ⚠ Le mode live exécute de vrais ordres avec votre argent.
+                <div style={{ fontSize: 12, color: '#ef9a9a', marginBottom: 14, padding: '10px 12px',
+                  background: '#1a0a0a', borderRadius: 6, border: '1px solid #c62828', lineHeight: 1.6 }}>
+                  ⚠ MODE LIVE ACTIVÉ — vrais ordres, argent réel.<br />
+                  Min. $15 par trade · Stop-loss auto activé
                 </div>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -418,33 +463,51 @@ export default function TradingPage() {
             <div style={{ ...card({ marginBottom: 12 }) }}>
               <Label>Gestion du risque</Label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <Field label="Stop Loss %"           value={sl}      set={setSl} />
-                <Field label="Take Profit %"          value={tp}      set={setTp} />
-                <Field label="Confiance min %"        value={minConf} set={setMinConf} />
-                <Field label="Positions max"          value={maxPos}  set={setMaxPos} />
+                <Field label="Stop Loss %"        value={sl}      set={setSl} />
+                <Field label="Take Profit %"      value={tp}      set={setTp} />
+                <Field label="Confiance min %"    value={minConf} set={setMinConf} />
+                <Field label="Positions max"      value={maxPos}  set={setMaxPos} />
               </div>
             </div>
 
             <div style={{ ...card({ marginBottom: 16 }) }}>
-              <Label>Exchanges (live seulement)</Label>
-              <p style={{ fontSize: 11, color: '#555', marginBottom: 10 }}>
-                Clés stockées uniquement en mémoire — jamais envoyées à un tiers.
+              <Label>Clés API exchanges</Label>
+              <p style={{ fontSize: 11, color: '#555', marginBottom: 12, lineHeight: 1.5 }}>
+                Stockées en mémoire serveur uniquement. Jamais transmises à un tiers.<br />
+                Laissez vide si déjà configurées via variables d'environnement Vercel.
               </p>
-              {['Binance API Key', 'Binance Secret', 'Alpaca API Key', 'Alpaca Secret'].map(l => (
-                <div key={l} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, color: '#666', marginBottom: 3 }}>{l}</div>
-                  <input type="password" placeholder={`${l}…`}
+              {([
+                ['Binance API Key',    binanceKey,    setBinanceKey],
+                ['Binance API Secret', binanceSecret, setBinanceSecret],
+                ['Alpaca API Key',     alpacaKey,     setAlpacaKey],
+                ['Alpaca API Secret',  alpacaSecret,  setAlpacaSecret],
+              ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
+                <div key={label} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, color: '#666', marginBottom: 3 }}>{label}</div>
+                  <input
+                    type="password"
+                    placeholder={`${label}…`}
+                    value={val}
+                    onChange={e => setter(e.target.value)}
+                    autoComplete="off"
                     style={{ width: '100%', padding: '9px 10px', background: '#0d0d0d',
-                      border: '1px solid #222', borderRadius: 8, color: '#e0e0e0', fontSize: 13, boxSizing: 'border-box' }} />
+                      border: `1px solid ${val ? '#2e5c1a' : '#222'}`,
+                      borderRadius: 8, color: '#e0e0e0', fontSize: 13, boxSizing: 'border-box' }}
+                  />
                 </div>
               ))}
+              <div style={{ marginTop: 10, fontSize: 11, color: '#444', lineHeight: 1.6 }}>
+                Binance: activez "Spot & Margin Trading" · désactivez les retraits<br />
+                Alpaca: créez un compte sur alpaca.markets (gratuit)
+              </div>
             </div>
 
             <button onClick={applySettings} disabled={loading}
               style={{ width: '100%', padding: '13px 0', fontSize: 14, fontWeight: 700,
-                background: loading ? '#1a1a1a' : '#f0c040', color: loading ? '#555' : '#111',
+                background: loading ? '#1a1a1a' : mode === 'live' ? '#c62828' : '#f0c040',
+                color: loading ? '#555' : mode === 'live' ? '#fff' : '#111',
                 border: 'none', borderRadius: 10, cursor: loading ? 'not-allowed' : 'pointer' }}>
-              {loading ? 'Application…' : '✓ Appliquer & Réinitialiser'}
+              {loading ? 'Application…' : mode === 'live' ? '🔴 Activer LIVE Trading' : '✓ Appliquer & Réinitialiser'}
             </button>
 
             {s && (
