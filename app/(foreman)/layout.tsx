@@ -1,4 +1,4 @@
-import Sidebar from '@/components/foreman/Sidebar'
+import ClientLayout from '@/components/foreman/ClientLayout'
 
 export const metadata = {
   title: 'Foreman — Cockpit de pilotage chantier',
@@ -6,12 +6,5 @@ export const metadata = {
 }
 
 export default function ForemanLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar />
-      <main className="flex-1 min-w-0 overflow-auto">
-        {children}
-      </main>
-    </div>
-  )
+  return <ClientLayout>{children}</ClientLayout>
 }
