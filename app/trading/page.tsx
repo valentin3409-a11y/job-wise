@@ -88,21 +88,42 @@ export default function TradingPage() {
   async function ctrl(action: string, extra?: object) {
     setLoading(true)
     try {
-      await fetch('/api/trading/control', {
+      const r = await fetch('/api/trading/control', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
       })
-      await loadState()
+      const d = await r.json()
+      // Use returned state directly to avoid hitting a different Lambda
+      if (d.state) setState(d.state)
+      else await loadState()
     } finally { setLoading(false) }
   }
 
   async function cycle() {
     setCycling(true)
     try {
-      await fetch('/api/trading/cycle', { method: 'POST' })
-      await loadState()
+      const r = await fetch('/api/trading/cycle', { method: 'POST' })
+      const d = await r.json()
+      if (d.state) setState(d.state)
     } finally { setCycling(false) }
+  }
+
+  // Start = apply config + run first cycle immediately so data appears
+  async function startWithCycle() {
+    setLoading(true)
+    try {
+      await fetch('/api/trading/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', config: buildConfig() }),
+      })
+      // Run cycle immediately on same Lambda (60s timeout)
+      setCycling(true)
+      const r = await fetch('/api/trading/cycle', { method: 'POST' })
+      const d = await r.json()
+      if (d.state) setState(d.state)
+    } finally { setLoading(false); setCycling(false) }
   }
 
   async function applySettings() {
@@ -156,7 +177,7 @@ export default function TradingPage() {
           <button onClick={() => ctrl('stop')} disabled={loading}
             style={btnStyle('#3a1b1b', '#ef9a9a', '#c62828')}>■ Stop</button>
         ) : (
-          <button onClick={() => ctrl('start', { config: buildConfig() })} disabled={loading}
+          <button onClick={startWithCycle} disabled={loading}
             style={btnStyle('#1b3a1b', '#81c784', '#2e7d32')}>▶ Démarrer</button>
         )}
         <button onClick={cycle} disabled={cycling || loading}
