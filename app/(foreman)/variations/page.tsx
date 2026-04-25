@@ -20,7 +20,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type VariationStatus = 'en_cours' | 'accepté' | 'refusé'
+type VariationStatus = 'en_cours' | 'accepté' | 'refusé' | 'delayed'
 type VariationCause = 'client_change' | 'design_error' | 'unforeseen' | 'weather'
 
 type Variation = {
@@ -78,6 +78,7 @@ const STATUS_CONFIG: Record<VariationStatus, { label: string; color: string; bg:
   en_cours: { label: 'En cours',  color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200',   Icon: Clock },
   accepté:  { label: 'Accepté',   color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', Icon: CheckCircle },
   refusé:   { label: 'Refusé',    color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200',     Icon: XCircle },
+  delayed:  { label: 'En retard', color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200',     Icon: AlertTriangle },
 }
 
 const CAUSE_CONFIG: Record<VariationCause, { label: string; color: string; bg: string }> = {
