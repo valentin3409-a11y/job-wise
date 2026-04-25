@@ -1,276 +1,513 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, Plus, Brain, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
+import {
+  AlertTriangle,
+  Brain,
+  ChevronDown,
+  ChevronUp,
+  Zap,
+  ArrowRight,
+  CheckCircle,
+  Eye,
+  ArrowUpCircle,
+  ListTree,
+} from 'lucide-react'
+import { useProject } from '@/lib/foreman/project-context'
 
-type Risk = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type RiskLevel = 'critique' | 'élevé' | 'moyen' | 'faible'
+
+type RiskCard = {
   id: number
+  level: RiskLevel
   title: string
-  category: string
-  priority: 'critical' | 'high' | 'medium' | 'low'
   probability: number
-  costImpact: number
-  delayImpact: number
-  status: 'open' | 'mitigated' | 'closed'
-  owner: string
+  impact: number
+  delay: number
+  blockedDeps: string[]
   recommendation: string
-  date: string
+  description: string
+  rootCause: string
 }
 
-const RISKS: Risk[] = [
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const RISKS: RiskCard[] = [
   {
     id: 1,
-    title: 'Sous-traitant plomberie — effectifs insuffisants',
-    category: 'Sous-traitance',
-    priority: 'critical',
-    probability: 90,
-    costImpact: 48_000,
-    delayImpact: 18,
-    status: 'open',
-    owner: 'Valentin',
-    recommendation: 'Contacter 2 sous-traitants alternatifs sous 48h. Si non résolu, envisager embauche directe d\'urgence.',
-    date: '2026-04-20',
+    level: 'critique',
+    title: 'Défaillance sous-traitant plomberie',
+    probability: 75,
+    impact: 280_000,
+    delay: 21,
+    blockedDeps: ['Second œuvre (6 lots)', 'Finitions (8 lots)'],
+    recommendation: 'Déclencher plan B sous-traitant dès aujourd\'hui. Contact PLB Services.',
+    description: 'L\'équipe de sous-traitance plomberie est en sous-effectif critique (2/4) depuis 3 semaines. Les délais contractuels sont menacés.',
+    rootCause: 'Problème de trésorerie du sous-traitant + départ de 2 compagnons qualifiés.',
   },
   {
     id: 2,
-    title: 'Retard livraison acier niveau 5-8',
-    category: 'Approvisionnement',
-    priority: 'high',
-    probability: 70,
-    costImpact: 22_000,
-    delayImpact: 12,
-    status: 'open',
-    owner: 'Marc D.',
-    recommendation: 'Pré-commander l\'acier pour les niveaux 5-8 immédiatement. Identifier fournisseur de substitution en région parisienne.',
-    date: '2026-04-18',
+    level: 'critique',
+    title: 'Rupture acier fournisseur',
+    probability: 60,
+    impact: 195_000,
+    delay: 14,
+    blockedDeps: ['Structure R5-R9', 'Armatures niveaux 6-9'],
+    recommendation: 'Commander surplus chez Arcelor via second fournisseur. Budget: +45K€.',
+    description: 'Alerte de rupture de stock reçue du fournisseur principal d\'acier BA. Délai de livraison porté à 6 semaines.',
+    rootCause: 'Tensions mondiales sur l\'acier + forte demande en région parisienne.',
   },
   {
     id: 3,
-    title: 'Surcoût main d\'œuvre gros oeuvre (+12%)',
-    category: 'Labour',
-    priority: 'high',
-    probability: 85,
-    costImpact: 35_000,
-    delayImpact: 0,
-    status: 'open',
-    owner: 'Valentin',
-    recommendation: 'Revoir la composition des équipes. Remplacer 3 postes par des compagnons moins expérimentés pour les tâches standardisées.',
-    date: '2026-04-15',
+    level: 'élevé',
+    title: 'Intempéries semaine 17-18',
+    probability: 65,
+    impact: 87_000,
+    delay: 5,
+    blockedDeps: ['Façade', 'Étanchéité', 'Terrasses'],
+    recommendation: 'Avancer travaux extérieurs avant jeudi. Prévoir bâches.',
+    description: 'Météo France annonce des vents violents (>70km/h) et précipitations importantes pour les semaines 17-18.',
+    rootCause: 'Phénomène météorologique saisonnier, imprévisible à long terme.',
   },
   {
     id: 4,
-    title: 'Conditions météo défavorables semaines 18-19',
-    category: 'Environnement',
-    priority: 'medium',
-    probability: 60,
-    costImpact: 8_500,
-    delayImpact: 5,
-    status: 'open',
-    owner: 'Chef chantier',
-    recommendation: 'Avancer les travaux extérieurs la semaine prochaine. Prévoir bâches de protection et planning de repli.',
-    date: '2026-04-22',
+    level: 'élevé',
+    title: 'Coordination défaillante niveaux 3-5',
+    probability: 50,
+    impact: 124_500,
+    delay: 8,
+    blockedDeps: ['Électricité', 'Plomberie', 'Ventilation'],
+    recommendation: 'Réunion coordination quotidienne 8h. Désigner coordinateur dédié.',
+    description: 'Conflits de planning entre corps d\'état aux niveaux 3 à 5. Interventions simultanées non coordonnées créent des pertes de temps.',
+    rootCause: 'Absence de coordinateur inter-corps sur ces niveaux.',
   },
   {
     id: 5,
-    title: 'Coordination défaillante niveaux 3-5',
-    category: 'Organisation',
-    priority: 'medium',
-    probability: 45,
-    costImpact: 12_000,
-    delayImpact: 7,
-    status: 'open',
-    owner: 'Sophie L.',
-    recommendation: 'Point quotidien inter-corps obligatoire. Nommer un coordinateur dédié pour les niveaux 3-5.',
-    date: '2026-04-16',
-  },
-  {
-    id: 6,
-    title: 'Non-conformité potentielle cage escalier R3',
-    category: 'Qualité',
-    priority: 'high',
+    level: 'moyen',
+    title: 'Pénurie main d\'œuvre spécialisée',
     probability: 40,
-    costImpact: 18_000,
-    delayImpact: 8,
-    status: 'open',
-    owner: 'Bureau de contrôle',
-    recommendation: 'Inspection immédiate avec bureau de contrôle. Suspendre les travaux sur ce secteur jusqu\'à validation.',
-    date: '2026-04-21',
-  },
-  {
-    id: 7,
-    title: 'Dépassement budget fondations',
-    category: 'Budget',
-    priority: 'low',
-    probability: 100,
-    costImpact: 14_000,
-    delayImpact: 0,
-    status: 'mitigated',
-    owner: 'Valentin',
-    recommendation: 'Absorbé par provision sur gros oeuvre. Surveillance renforcée des corps suivants.',
-    date: '2026-03-10',
+    impact: 161_000,
+    delay: 10,
+    blockedDeps: ['Menuiserie métallique', 'Serrurerie'],
+    recommendation: 'Contacter 3 agences intérim spécialisées cette semaine.',
+    description: 'Tension sur le marché du travail spécialisé (menuisiers métalliques, serruriers). Plusieurs lots à venir nécessitent ces profils.',
+    rootCause: 'Fort carnet de commandes régional. Compétition accrue entre chantiers IDF.',
   },
 ]
 
-const PRIORITY_CONFIG = {
-  critical: { label: 'Critique', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', dot: 'bg-red-500' },
-  high: { label: 'Élevé', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', dot: 'bg-orange-500' },
-  medium: { label: 'Moyen', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', dot: 'bg-amber-400' },
-  low: { label: 'Faible', color: 'text-slate-500', bg: 'bg-slate-50', border: 'border-slate-200', dot: 'bg-slate-400' },
+type CriticalTask = {
+  id: string
+  label: string
+  progress: number | null
+  status: 'done' | 'active' | 'blocked' | 'critical'
+  retardLabel?: string
 }
 
-function fmt(n: number) {
-  return n >= 1_000 ? `${(n / 1_000).toFixed(0)} K€` : `${n} €`
+const CRITICAL_PATH: CriticalTask[] = [
+  { id: 'fond',    label: 'Fondations',        progress: 100, status: 'done' },
+  { id: 'struct04',label: 'Structure R0-R4',   progress: 65,  status: 'active' },
+  { id: 'plomb',   label: 'Plomberie encastrée',progress: 41, status: 'critical', retardLabel: 'RETARD 3 semaines' },
+  { id: 'struct59',label: 'Structure R5-R9',   progress: 20,  status: 'active' },
+  { id: 'second',  label: 'Second œuvre',      progress: null,status: 'blocked' },
+  { id: 'finish',  label: 'Finitions',         progress: null,status: 'blocked' },
+]
+
+// Dependency matrix data: [source, target] = true if dependency
+type DepMatrix = {
+  tasks: string[]
+  deps: boolean[][]
+  atRisk: boolean[][]
 }
 
-export default function Risks() {
-  const [expanded, setExpanded] = useState<number | null>(null)
-  const [filter, setFilter] = useState<'all' | 'open' | 'mitigated'>('open')
+const DEPENDENCY_MATRIX: DepMatrix = {
+  tasks: ['Fondations', 'Structure R0-R4', 'Plomberie', 'Second œuvre', 'Finitions'],
+  deps: [
+    [false, true,  false, false, false],
+    [false, false, true,  true,  false],
+    [false, false, false, true,  false],
+    [false, false, false, false, true ],
+    [false, false, false, false, false],
+  ],
+  atRisk: [
+    [false, false, false, false, false],
+    [false, false, true,  true,  false],
+    [false, false, false, true,  false],
+    [false, false, false, false, true ],
+    [false, false, false, false, false],
+  ],
+}
 
-  const filtered = RISKS.filter(r => filter === 'all' || r.status === filter)
-  const totalCostImpact = RISKS.filter(r => r.status === 'open').reduce((s, r) => s + r.costImpact, 0)
-  const totalDelayImpact = Math.max(...RISKS.filter(r => r.status === 'open').map(r => r.delayImpact))
-  const criticalCount = RISKS.filter(r => r.priority === 'critical' && r.status === 'open').length
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} M€`
+  if (n >= 1_000) return `${Math.round(n / 1_000)} K€`
+  return `${n} €`
+}
+
+type LevelCfg = { bg: string; text: string; border: string; dot: string; badge: string }
+
+function levelCfg(level: RiskLevel): LevelCfg {
+  switch (level) {
+    case 'critique': return {
+      bg: 'bg-red-50',     text: 'text-red-700',     border: 'border-red-200',
+      dot: 'bg-red-500',   badge: 'bg-red-500 text-white',
+    }
+    case 'élevé': return {
+      bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',
+      dot: 'bg-orange-500',badge: 'bg-orange-500 text-white',
+    }
+    case 'moyen': return {
+      bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',
+      dot: 'bg-amber-400', badge: 'bg-amber-400 text-white',
+    }
+    case 'faible': return {
+      bg: 'bg-slate-50',   text: 'text-slate-600',   border: 'border-slate-200',
+      dot: 'bg-slate-400', badge: 'bg-slate-400 text-white',
+    }
+  }
+}
+
+// ─── Critical Path component ──────────────────────────────────────────────────
+
+function CriticalPath() {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <Zap className="w-5 h-5 text-amber-500" />
+        <h2 className="font-semibold text-slate-800 text-base">Chemin Critique</h2>
+        <span className="ml-auto text-xs bg-red-100 text-red-700 border border-red-200 font-semibold px-2 py-0.5 rounded-full">
+          +12 jours de retard estimé
+        </span>
+      </div>
+
+      {/* Flow diagram */}
+      <div className="overflow-x-auto pb-2">
+        <div className="flex items-start gap-2 min-w-max">
+          {CRITICAL_PATH.map((task, i) => {
+            const isDone     = task.status === 'done'
+            const isCritical = task.status === 'critical'
+            const isBlocked  = task.status === 'blocked'
+            const isActive   = task.status === 'active'
+
+            const boxBg =
+              isDone     ? 'bg-emerald-50 border-emerald-300' :
+              isCritical ? 'bg-red-50 border-red-400' :
+              isBlocked  ? 'bg-slate-100 border-slate-300' :
+                           'bg-blue-50 border-blue-300'
+
+            const titleColor =
+              isDone     ? 'text-emerald-700' :
+              isCritical ? 'text-red-700' :
+              isBlocked  ? 'text-slate-400' :
+                           'text-blue-700'
+
+            return (
+              <div key={task.id} className="flex items-start gap-2">
+                <div className={`relative border-2 rounded-xl p-3 w-36 shadow-sm ${boxBg} ${isCritical ? 'ring-2 ring-red-400 ring-offset-1' : ''}`}>
+                  {isCritical && (
+                    <div className="absolute -top-1.5 -right-1.5 w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  <p className={`text-xs font-semibold leading-tight mb-2 ${titleColor}`}>{task.label}</p>
+                  {isDone && (
+                    <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                      <CheckCircle className="w-3 h-3" /> Terminé
+                    </div>
+                  )}
+                  {(isActive || isCritical) && task.progress !== null && (
+                    <div>
+                      <div className="flex justify-between text-[10px] text-slate-500 mb-1">
+                        <span>Avancement</span><span>{task.progress}%</span>
+                      </div>
+                      <div className="h-1.5 bg-white rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${isCritical ? 'bg-red-500' : 'bg-blue-500'}`}
+                          style={{ width: `${task.progress}%` }}
+                        />
+                      </div>
+                      {isCritical && task.retardLabel && (
+                        <p className="text-[10px] font-bold text-red-600 mt-1.5">{task.retardLabel}</p>
+                      )}
+                    </div>
+                  )}
+                  {isBlocked && (
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BLOQUÉ</div>
+                  )}
+                </div>
+                {i < CRITICAL_PATH.length - 1 && (
+                  <div className="flex items-center self-center">
+                    <ArrowRight className={`w-5 h-5 ${
+                      CRITICAL_PATH[i + 1].status === 'blocked' ? 'text-red-400' : 'text-slate-300'
+                    }`} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Cascade warning */}
+      <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
+        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-red-700 leading-relaxed">
+          <strong>Cascade de retard:</strong> Retard plomberie → bloque second œuvre → bloque finitions → <strong>+3 semaines sur livraison finale</strong>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Risk card component ──────────────────────────────────────────────────────
+
+function RiskCardComponent({ risk }: { risk: RiskCard }) {
+  const [expanded, setExpanded] = useState(false)
+  const cfg = levelCfg(risk.level)
+  const exposition = Math.round(risk.impact * risk.probability / 100)
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Risks & Issues</h1>
-          <p className="text-slate-500 mt-1">Suivi des risques et problèmes ouverts</p>
+    <div className={`rounded-xl border shadow-sm overflow-hidden ${cfg.border} ${risk.level === 'critique' ? 'ring-1 ring-red-300' : ''}`}>
+      {/* Header row */}
+      <button
+        className={`w-full flex items-start gap-3 p-4 text-left hover:bg-slate-50/50 transition-colors ${cfg.bg}`}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <div className="flex-shrink-0 mt-0.5">
+          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${cfg.badge}`}>
+            {risk.level}
+          </span>
         </div>
-        <button className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2.5 rounded-lg text-sm transition-colors shadow-sm">
-          <Plus className="w-4 h-4" />
-          Nouveau risque
-        </button>
-      </div>
-
-      {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-red-500 uppercase tracking-wider">Critique</div>
-          <div className="text-3xl font-bold text-red-600 mt-1">{criticalCount}</div>
-          <div className="text-xs text-red-400 mt-1">Action immédiate requise</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-800 leading-snug">{risk.title}</p>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <span className="text-xs text-slate-500">Prob. <strong className={cfg.text}>{risk.probability}%</strong></span>
+            <span className="text-xs text-slate-300">·</span>
+            <span className="text-xs text-slate-500">Impact <strong className="text-red-600">{fmt(risk.impact)}</strong></span>
+            <span className="text-xs text-slate-300">·</span>
+            <span className="text-xs text-slate-500">Délai <strong className="text-amber-600">+{risk.delay}j</strong></span>
+            <span className="text-xs text-slate-300">·</span>
+            <span className="text-xs text-slate-500">Exposition <strong className="text-red-700">{fmt(exposition)}</strong></span>
+          </div>
+          {/* Blocked dependencies */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {risk.blockedDeps.map(dep => (
+              <span key={dep} className="text-[10px] bg-red-100 text-red-600 border border-red-200 px-1.5 py-0.5 rounded font-medium">
+                🔒 {dep}
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-orange-500 uppercase tracking-wider">Risques ouverts</div>
-          <div className="text-3xl font-bold text-orange-600 mt-1">{RISKS.filter(r => r.status === 'open').length}</div>
-          <div className="text-xs text-orange-400 mt-1">À traiter</div>
+        <div className="flex-shrink-0 mt-1">
+          {expanded
+            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+            : <ChevronDown className="w-4 h-4 text-slate-400" />
+          }
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-amber-600 uppercase tracking-wider">Impact budget total</div>
-          <div className="text-3xl font-bold text-amber-700 mt-1">{fmt(totalCostImpact)}</div>
-          <div className="text-xs text-amber-500 mt-1">Si tous non traités</div>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-blue-500 uppercase tracking-wider">Délai max cumulé</div>
-          <div className="text-3xl font-bold text-blue-600 mt-1">{totalDelayImpact} j.</div>
-          <div className="text-xs text-blue-400 mt-1">Impact potentiel</div>
-        </div>
-      </div>
+      </button>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 bg-slate-100 p-1 rounded-lg mb-5 w-fit">
-        {(['open', 'mitigated', 'all'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            {f === 'open' ? `Ouverts (${RISKS.filter(r => r.status === 'open').length})` : f === 'mitigated' ? 'Atténués' : 'Tous'}
-          </button>
-        ))}
-      </div>
-
-      {/* Risk list */}
-      <div className="space-y-3">
-        {filtered.map(risk => {
-          const cfg = PRIORITY_CONFIG[risk.priority]
-          const isExpanded = expanded === risk.id
-
-          return (
-            <div
-              key={risk.id}
-              className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all ${cfg.border}`}
-            >
-              <button
-                className="w-full flex items-center gap-4 p-4 text-left hover:bg-slate-50 transition-colors"
-                onClick={() => setExpanded(isExpanded ? null : risk.id)}
-              >
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-800 text-sm">{risk.title}</span>
-                    {risk.status === 'mitigated' && (
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Atténué</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
-                    <span className={`font-medium ${cfg.color}`}>{cfg.label}</span>
-                    <span>·</span>
-                    <span>{risk.category}</span>
-                    <span>·</span>
-                    <span>Propriétaire: {risk.owner}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 flex-shrink-0 text-right">
-                  <div className="hidden sm:block">
-                    <div className="text-xs text-slate-400">Impact coût</div>
-                    <div className="text-sm font-bold text-red-500">{fmt(risk.costImpact)}</div>
-                  </div>
-                  <div className="hidden sm:block">
-                    <div className="text-xs text-slate-400">Délai</div>
-                    <div className="text-sm font-bold text-blue-500">{risk.delayImpact > 0 ? `${risk.delayImpact}j` : '—'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-400">Prob.</div>
-                    <div className="text-sm font-bold text-slate-700">{risk.probability}%</div>
-                  </div>
-                  {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </div>
-              </button>
-
-              {isExpanded && (
-                <div className={`border-t ${cfg.border} ${cfg.bg} p-4`}>
-                  <div className="flex items-start gap-2 mb-3">
-                    <Brain className="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-semibold text-violet-600 uppercase tracking-wider mb-1">Recommandation IA</div>
-                      <p className="text-sm text-slate-700 leading-relaxed">{risk.recommendation}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3 mt-3">
-                    <div className="bg-white rounded-lg p-3 border border-slate-200">
-                      <div className="text-xs text-slate-500">Impact budget</div>
-                      <div className="font-bold text-red-500">{fmt(risk.costImpact)}</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border border-slate-200">
-                      <div className="text-xs text-slate-500">Impact délai</div>
-                      <div className="font-bold text-blue-500">{risk.delayImpact > 0 ? `${risk.delayImpact} jours` : 'Aucun'}</div>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 border border-slate-200">
-                      <div className="text-xs text-slate-500">Probabilité</div>
-                      <div className="font-bold text-slate-700">{risk.probability}%</div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <button className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      Marquer résolu
-                    </button>
-                    <button className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                      Créer une tâche associée
-                    </button>
-                    <button className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
-                      Escalader
-                    </button>
-                  </div>
-                </div>
-              )}
+      {/* Expanded detail */}
+      {expanded && (
+        <div className={`border-t ${cfg.border} p-4 space-y-3`}>
+          {/* Description + Root cause */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-white rounded-lg border border-slate-100 p-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Description</p>
+              <p className="text-xs text-slate-600 leading-relaxed">{risk.description}</p>
             </div>
-          )
-        })}
+            <div className="bg-white rounded-lg border border-slate-100 p-3">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Cause racine</p>
+              <p className="text-xs text-slate-600 leading-relaxed">{risk.rootCause}</p>
+            </div>
+          </div>
+
+          {/* AI Recommendation */}
+          <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-lg p-3">
+            <Brain className="w-4 h-4 text-violet-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-violet-600 uppercase tracking-wider mb-1">Recommandation IA</p>
+              <p className="text-sm text-violet-800 leading-relaxed">{risk.recommendation}</p>
+            </div>
+          </div>
+
+          {/* Probability gauge */}
+          <div>
+            <div className="flex justify-between text-xs text-slate-500 mb-1">
+              <span>Probabilité d&apos;occurrence</span>
+              <span className={`font-bold ${cfg.text}`}>{risk.probability}%</span>
+            </div>
+            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${
+                  risk.level === 'critique' ? 'bg-red-500' :
+                  risk.level === 'élevé'    ? 'bg-orange-500' :
+                  risk.level === 'moyen'    ? 'bg-amber-400' : 'bg-slate-400'
+                }`}
+                style={{ width: `${risk.probability}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            <button className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <CheckCircle className="w-3.5 h-3.5" /> Créer tâche
+            </button>
+            <button className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <Eye className="w-3.5 h-3.5" /> Voir dépendances
+            </button>
+            <button className="flex items-center gap-1.5 bg-white border border-red-200 hover:bg-red-50 text-red-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <ArrowUpCircle className="w-3.5 h-3.5" /> Escalader
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Dependency Matrix component ──────────────────────────────────────────────
+
+function DependencyMatrix() {
+  const [open, setOpen] = useState(false)
+  const { tasks, deps, atRisk } = DEPENDENCY_MATRIX
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
+        onClick={() => setOpen(v => !v)}
+      >
+        <div className="flex items-center gap-2">
+          <ListTree className="w-4 h-4 text-slate-500" />
+          <span className="font-semibold text-slate-800">Matrice des dépendances</span>
+          <span className="text-xs text-slate-400 ml-1">(tâches critiques)</span>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100 p-5">
+          <p className="text-xs text-slate-400 mb-4">
+            Lignes = source · Colonnes = tâche dépendante · <span className="text-slate-600 font-medium">●</span> dépendance normale · <span className="text-red-500 font-bold">●</span> dépendance à risque
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left text-xs font-semibold text-slate-500 px-3 py-2 bg-slate-50 border border-slate-200 w-40">
+                    Source \ Cible
+                  </th>
+                  {tasks.map(t => (
+                    <th key={t} className="text-center text-xs font-semibold text-slate-600 px-3 py-2 bg-slate-50 border border-slate-200 max-w-[100px]">
+                      <span className="block truncate max-w-[80px] mx-auto" title={t}>{t}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tasks.map((rowTask, rowIdx) => (
+                  <tr key={rowTask} className="hover:bg-slate-50 transition-colors">
+                    <td className="text-xs font-medium text-slate-700 px-3 py-2.5 border border-slate-200 bg-slate-50">
+                      {rowTask}
+                    </td>
+                    {tasks.map((_, colIdx) => {
+                      const hasDep  = deps[rowIdx][colIdx]
+                      const isRisk  = atRisk[rowIdx][colIdx]
+                      const isSelf  = rowIdx === colIdx
+                      return (
+                        <td key={colIdx} className="text-center px-3 py-2.5 border border-slate-200">
+                          {isSelf ? (
+                            <span className="text-slate-200 text-xs">—</span>
+                          ) : hasDep ? (
+                            <span
+                              className={`text-lg leading-none ${isRisk ? 'text-red-500' : 'text-slate-500'}`}
+                              title={isRisk ? 'Dépendance à risque' : 'Dépendance normale'}
+                            >
+                              ●
+                            </span>
+                          ) : (
+                            <span className="text-slate-100 text-xs">·</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5"><span className="text-slate-500 font-bold text-base leading-none">●</span> Dépendance normale</div>
+            <div className="flex items-center gap-1.5"><span className="text-red-500 font-bold text-base leading-none">●</span> Dépendance à risque</div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+export default function RisksPage() {
+  useProject()
+
+  const criticalCount  = RISKS.filter(r => r.level === 'critique').length
+  const elevéCount     = RISKS.filter(r => r.level === 'élevé').length
+  const totalExposition = RISKS.reduce((s, r) => s + Math.round(r.impact * r.probability / 100), 0)
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Risques &amp; Dépendances</h1>
+        <p className="text-slate-500 mt-1">Détection proactive, chemin critique, impact financier</p>
       </div>
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-red-50 rounded-xl border border-red-200 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-1">Risques critiques</div>
+          <div className="text-3xl font-bold text-red-600">{criticalCount}</div>
+          <div className="text-xs text-red-400 mt-1">Action immédiate</div>
+        </div>
+        <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-orange-500 uppercase tracking-wider mb-1">Risques élevés</div>
+          <div className="text-3xl font-bold text-orange-600">{elevéCount}</div>
+          <div className="text-xs text-orange-400 mt-1">Surveillance accrue</div>
+        </div>
+        <div className="bg-red-50 rounded-xl border border-red-200 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-1">Exposition totale</div>
+          <div className="text-2xl font-bold text-red-700">{fmt(totalExposition)}</div>
+          <div className="text-xs text-red-400 mt-1">Impact pondéré</div>
+        </div>
+        <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-amber-600 uppercase tracking-wider mb-1">Chemin critique</div>
+          <div className="text-2xl font-bold text-amber-700">12 jours</div>
+          <div className="text-xs text-amber-500 mt-1">De retard cumulé</div>
+        </div>
+      </div>
+
+      {/* Critical Path section */}
+      <CriticalPath />
+
+      {/* Risk Cards */}
+      <div>
+        <h2 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+          Registre des risques
+          <span className="text-xs text-slate-400 font-normal ml-1">{RISKS.length} risques identifiés</span>
+        </h2>
+        <div className="space-y-3">
+          {RISKS.map(risk => (
+            <RiskCardComponent key={risk.id} risk={risk} />
+          ))}
+        </div>
+      </div>
+
+      {/* Dependency Matrix (collapsible) */}
+      <DependencyMatrix />
     </div>
   )
 }

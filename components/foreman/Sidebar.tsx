@@ -7,17 +7,23 @@ import {
   Zap, DollarSign, Ruler, HardHat, CalendarDays, Users, AlertTriangle,
   CheckSquare, MessageSquare, Mail, Bell, Brain, BarChart3, FolderOpen,
   Settings, ChevronDown, Menu, X, Building2, Plus, Check, Lock,
+  ImageIcon, Package, FileEdit, Layers,
 } from 'lucide-react'
 import { useProject, ROLE_CONFIG, type Project } from '@/lib/foreman/project-context'
 
 const NAV_ITEMS = [
   { href: '/command-center', icon: Zap,           label: 'Command Center', section: 'command-center' },
+  { href: '/projects',       icon: Layers,        label: 'Mes projets',    section: 'projects' },
   { href: '/financials',     icon: DollarSign,    label: 'Financials',     section: 'financials' },
   { href: '/takeoff',        icon: Ruler,         label: 'Takeoff',        section: 'takeoff' },
+  { href: '/plans',          icon: ImageIcon,     label: 'Plans',          section: 'plans' },
+  { href: '/decisions',      icon: Brain,         label: 'AI Decisions',   section: 'decisions', badge: 3 },
   { href: '/site',           icon: HardHat,       label: 'Site',           section: 'site' },
   { href: '/planning',       icon: CalendarDays,  label: 'Planning',       section: 'planning' },
   { href: '/labour',         icon: Users,         label: 'Labour',         section: 'labour' },
   { href: '/risks',          icon: AlertTriangle, label: 'Risks',          section: 'risks',    badge: 4 },
+  { href: '/procurement',    icon: Package,       label: 'Procurement',    section: 'procurement' },
+  { href: '/variations',     icon: FileEdit,      label: 'Variations',     section: 'variations' },
   { href: '/tasks',          icon: CheckSquare,   label: 'Tasks',          section: 'tasks' },
   { href: '/chat',           icon: MessageSquare, label: 'Chat',           section: 'chat' },
   { href: '/emails',         icon: Mail,          label: 'Emails',         section: 'emails',   badge: 7 },

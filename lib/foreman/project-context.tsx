@@ -41,7 +41,7 @@ export const ROLE_CONFIG: Record<UserRole, {
     color: 'text-blue-700',
     bg: 'bg-blue-50',
     border: 'border-blue-200',
-    allowedSections: ['command-center','financials','takeoff','site','planning','labour','risks','tasks','chat','emails','alerts','ai-assistant','reports','documents'],
+    allowedSections: ['command-center','financials','takeoff','site','planning','labour','risks','tasks','chat','emails','alerts','ai-assistant','reports','documents','projects','plans','decisions','procurement','variations'],
     description: 'Accès complet sauf paramètres entreprise',
   },
   supervisor: {
@@ -49,7 +49,7 @@ export const ROLE_CONFIG: Record<UserRole, {
     color: 'text-amber-700',
     bg: 'bg-amber-50',
     border: 'border-amber-200',
-    allowedSections: ['site','planning','labour','tasks','chat','alerts','documents'],
+    allowedSections: ['site','planning','labour','tasks','chat','alerts','documents','plans'],
     description: 'Terrain uniquement — pas de financials, pas de marges',
   },
   client: {
