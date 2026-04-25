@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const imageFiles = inputFiles.filter(f => f.type.startsWith('image/')).slice(0, 20)
     const textFiles  = inputFiles.filter(f => !f.type.startsWith('image/'))
 
-    const userContent: Anthropic.ContentBlockParam[] = []
+    const userContent: (Anthropic.TextBlockParam | Anthropic.ImageBlockParam)[] = []
 
     if (imageFiles.length > 0) {
       userContent.push({
